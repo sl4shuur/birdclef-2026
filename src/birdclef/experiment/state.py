@@ -10,8 +10,8 @@ from pathlib import Path
 
 from lightning.pytorch.utilities import rank_zero_only
 
-from kaggle_starter.core.schemas import Phase, RunState
-from kaggle_starter.loggers import CustomLogger
+from birdclef.core.schemas import Phase, RunState
+from birdclef.loggers import CustomLogger
 
 
 def load_state(output_dir: Path) -> dict[str, object]:

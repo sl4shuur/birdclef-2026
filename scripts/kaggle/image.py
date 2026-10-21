@@ -5,7 +5,7 @@ from urllib.parse import unquote, urlsplit
 
 import rich_click as click
 
-from kaggle_starter.config import PROJECT_ROOT
+from birdclef.config import PROJECT_ROOT
 from scripts.wheelhouse_common import EXTRAS, run
 
 # fmt: off
@@ -38,7 +38,7 @@ def image_python() -> str:
 
 
 def shared_with_image() -> dict[str, str]:
-    """The image's versions of the packages kaggle_starter installs that the image also has."""
+    """The image's versions of the packages birdclef installs that the image also has."""
     image = parse_freeze(_read_freeze())
     constraints = "".join(
         f"{name}=={version}\n" for name, version in image.items() if version and name != "torch"
@@ -52,7 +52,7 @@ def shared_with_image() -> dict[str, str]:
 
 
 def missing_from_image() -> dict[str, str]:
-    """Everything kaggle_starter and the notebooks need that the image lacks."""
+    """Everything birdclef and the notebooks need that the image lacks."""
     image = parse_freeze(_read_freeze())
     # A requirement with a marker that never holds is dropped from the resolution.
     # That leaves out the image's packages, and torch's CUDA dependencies with them.

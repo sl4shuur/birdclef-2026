@@ -1,7 +1,7 @@
 [project]
-name = "kaggle-starter"
+name = "birdclef-2026"
 version = "0.1.0"
-description = "Reusable ML competition starter for Kaggle, Colab, and local experiments"
+description = "Acoustic Species Identification in the Pantanal, South America"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -23,7 +23,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/kaggle_starter"]
+packages = ["src/birdclef"]
 
 [tool.uv]
 default-groups = ["dev"]
@@ -49,7 +49,7 @@ dev = ["pytest>=8", "ruff>=0.8", "build>=1.2"]
 line-length = 100
 target-version = "py312"
 extend-exclude = [
-  "src/kaggle_starter/loggers/*.py",
+  "src/birdclef/loggers/*.py",
   "*.ipynb"
 ]
 

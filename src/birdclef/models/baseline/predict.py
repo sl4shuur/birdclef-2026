@@ -4,8 +4,8 @@ from pathlib import Path
 
 import rich_click as click
 
-from kaggle_starter.cli_common import CONTEXT_SETTINGS, load_config
-from kaggle_starter.models.baseline.config import BaselineExperimentConfig
+from birdclef.cli_common import CONTEXT_SETTINGS, load_config
+from birdclef.models.baseline.config import BaselineExperimentConfig
 
 
 @click.command(context_settings=CONTEXT_SETTINGS)
@@ -20,7 +20,7 @@ def predict(run: Path, input_path: Path, output: Path, accelerator: str) -> None
 
     import pandas as pd
 
-    from kaggle_starter.models.baseline.model import Baseline
+    from birdclef.models.baseline.model import Baseline
 
     try:
         predictions = Baseline.from_run(run, config=config).predict(pd.read_csv(input_path))

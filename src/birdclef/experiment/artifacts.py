@@ -8,7 +8,7 @@ from pathlib import Path
 
 from lightning.pytorch.utilities import rank_zero_only
 
-from kaggle_starter.config import Config
+from birdclef.config import Config
 
 
 # Only rank 0 writes the shared files; `rank_zero_only` skips the call on every other rank.

@@ -58,7 +58,7 @@ def pin() -> None:
     help="Create the first Dataset version instead of updating an existing one.",
 )
 def publish(message: str | None, dry_run: bool, create: bool) -> None:
-    """Upload kaggle_starter and the packages the image lacks as a new dataset version."""
+    """Upload birdclef and the packages the image lacks as a new dataset version."""
     click.secho(
         "Checking pins against the Kaggle image (resolving shared dependencies)...", fg="yellow"
     )
@@ -68,13 +68,13 @@ def publish(message: str | None, dry_run: bool, create: bool) -> None:
         )
     click.secho("Pins match the image.", fg="green")
 
-    click.echo(f"Building the kaggle_starter wheel in a fresh staging directory: {STAGE}...")
+    click.echo(f"Building the birdclef wheel in a fresh staging directory: {STAGE}...")
     version = build_wheel(STAGE)
     click.secho(f"Built kaggle-starter=={version}.", fg="green")
 
     click.echo("Resolving dependencies missing from the Kaggle image...")
     missing = missing_from_image()
-    click.echo(f"Resolved {len(missing)} packages to ship alongside kaggle_starter.")
+    click.echo(f"Resolved {len(missing)} packages to ship alongside birdclef.")
     download_wheels(missing)
 
     click.echo("Writing requirements.txt and dataset metadata...")

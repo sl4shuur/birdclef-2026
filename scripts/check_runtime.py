@@ -1,7 +1,7 @@
 """Optional PyTorch/Lightning hardware check. Install with --extra deep-learning."""
 
-from kaggle_starter.config import Config
-from kaggle_starter.runtime.hardware import resolve_runtime
+from birdclef.config import Config
+from birdclef.runtime.hardware import resolve_runtime
 
 
 def main() -> None:

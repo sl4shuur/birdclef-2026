@@ -6,7 +6,7 @@ import lightning as L
 import torch
 from lightning.pytorch.utilities.types import OptimizerLRScheduler
 
-from kaggle_starter.config import LRSchedulerConfig
+from birdclef.config import LRSchedulerConfig
 
 type TrainingBatch = tuple[torch.Tensor, torch.Tensor]
 

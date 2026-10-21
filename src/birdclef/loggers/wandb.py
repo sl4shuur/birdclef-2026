@@ -7,7 +7,7 @@ import wandb
 from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.utilities import rank_zero_only
 
-from kaggle_starter.config import TrackingConfig
+from birdclef.config import TrackingConfig
 
 
 def _open(config: TrackingConfig, run_id: str | None, name: str, save_dir: Path) -> WandbLogger:

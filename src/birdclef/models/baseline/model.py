@@ -12,13 +12,13 @@ import torch
 from lightning.pytorch.utilities import rank_zero_only
 from torch.utils.data import TensorDataset
 
-from kaggle_starter.core.schemas import Candidate
-from kaggle_starter.data.datamodule import TrainingDataModule, prediction_dataloader
-from kaggle_starter.experiment.contract import KaggleModel, RunContext
-from kaggle_starter.models.baseline.config import BaselineExperimentConfig
-from kaggle_starter.models.baseline.network import BaselineModule
-from kaggle_starter.models.checkpoints import read_fit_state
-from kaggle_starter.models.trainer import fit_module, predict_module
+from birdclef.core.schemas import Candidate
+from birdclef.data.datamodule import TrainingDataModule, prediction_dataloader
+from birdclef.experiment.contract import KaggleModel, RunContext
+from birdclef.models.baseline.config import BaselineExperimentConfig
+from birdclef.models.baseline.network import BaselineModule
+from birdclef.models.checkpoints import read_fit_state
+from birdclef.models.trainer import fit_module, predict_module
 
 
 class Baseline(KaggleModel):

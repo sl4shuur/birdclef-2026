@@ -3,7 +3,7 @@ from collections.abc import Callable
 from logging.config import dictConfig
 from typing import Any
 
-from kaggle_starter.config import LoggingConfig
+from birdclef.config import LoggingConfig
 
 from .logging_formatters import ColoredFormatter, ContextualColorFormatter
 

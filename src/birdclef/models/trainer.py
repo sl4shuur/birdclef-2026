@@ -9,15 +9,15 @@ from lightning.pytorch.strategies import DDPStrategy
 from torch.nn.parallel import DistributedDataParallel
 from torch.utils.data import DataLoader
 
-from kaggle_starter.config import LoaderConfig, RuntimeConfig, TrainConfig
-from kaggle_starter.experiment.contract import RunContext
-from kaggle_starter.models.checkpoints import (
+from birdclef.config import LoaderConfig, RuntimeConfig, TrainConfig
+from birdclef.experiment.contract import RunContext
+from birdclef.models.checkpoints import (
     FitState,
     read_fit_state,
     save_fit_state,
     training_callbacks,
 )
-from kaggle_starter.runtime.hardware import resolve_runtime
+from birdclef.runtime.hardware import resolve_runtime
 
 
 class _CurrentStreamDDPStrategy(DDPStrategy):

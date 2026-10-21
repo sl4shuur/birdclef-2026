@@ -3,9 +3,9 @@
 import torch
 from torch import nn
 
-from kaggle_starter.config import LRSchedulerConfig
-from kaggle_starter.models.baseline.config import ModelConfig
-from kaggle_starter.models.common import KaggleModule, TrainingBatch
+from birdclef.config import LRSchedulerConfig
+from birdclef.models.baseline.config import ModelConfig
+from birdclef.models.common import KaggleModule, TrainingBatch
 
 
 class BaselineModule(KaggleModule):

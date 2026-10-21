@@ -2,7 +2,7 @@
 
 from pydantic import Field, model_validator
 
-from kaggle_starter.config import Config, ConfigModel
+from birdclef.config import Config, ConfigModel
 
 
 class ModelConfig(ConfigModel):

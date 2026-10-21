@@ -2,7 +2,7 @@
 
 import torch
 
-from kaggle_starter.config import RuntimeConfig
+from birdclef.config import RuntimeConfig
 
 
 def resolve_runtime(config: RuntimeConfig) -> RuntimeConfig:

@@ -5,10 +5,10 @@ Keep model architecture, dataset details and metric definitions in their own mod
 
 from pathlib import Path
 
-from kaggle_starter.config import Config
-from kaggle_starter.core.schemas import DataSplit
-from kaggle_starter.experiment.contract import KaggleModel
-from kaggle_starter.loggers import CustomLogger
+from birdclef.config import Config
+from birdclef.core.schemas import DataSplit
+from birdclef.experiment.contract import KaggleModel
+from birdclef.loggers import CustomLogger
 
 
 def run_experiment(

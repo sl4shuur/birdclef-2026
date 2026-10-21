@@ -14,7 +14,7 @@ from rich.text import Text
 def _project_root() -> Path:
     for candidate in Path(__file__).resolve().parents:
         if (candidate / "pyproject.toml").exists() and (
-            candidate / "src" / "kaggle_starter"
+            candidate / "src" / "birdclef"
         ).exists():
             return candidate
     return Path.cwd()
@@ -125,11 +125,11 @@ class Config(BaseSettings, ConfigModel):
     model_config = SettingsConfigDict(
         env_file=PROJECT_ROOT / ".env",
         env_file_encoding="utf-8",
-        env_prefix="KS_",
+        env_prefix="BCLEF_",
         env_nested_delimiter="__",
         extra="ignore",
     )
-    app_name: str = "kaggle_starter"
+    app_name: str = "birdclef"
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     data: DataConfig = Field(default_factory=DataConfig)
     split: SplitConfig = Field(default_factory=SplitConfig)

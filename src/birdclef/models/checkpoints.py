@@ -8,7 +8,7 @@ from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint
 from lightning.pytorch.utilities import rank_zero_only
 from pydantic import BaseModel, Field
 
-from kaggle_starter.config import TrainConfig
+from birdclef.config import TrainConfig
 
 
 class TrainingCallbacks(NamedTuple):

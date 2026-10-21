@@ -10,8 +10,8 @@ from pathlib import Path
 
 import rich_click as click
 
-from kaggle_starter.cli_common import CONTEXT_SETTINGS, fit_options, load_config
-from kaggle_starter.models.baseline.config import BaselineExperimentConfig
+from birdclef.cli_common import CONTEXT_SETTINGS, fit_options, load_config
+from birdclef.models.baseline.config import BaselineExperimentConfig
 
 
 @click.command(context_settings=CONTEXT_SETTINGS)
@@ -29,9 +29,9 @@ def fit(config_path: Path, name: str, dataset_id: str, train_path: Path, valid_p
     import pandas as pd
     from lightning.pytorch.utilities import rank_zero_only
 
-    from kaggle_starter.experiment.contract import RunContext
-    from kaggle_starter.loggers import CustomLogger, apply_logging_config, wandb_run
-    from kaggle_starter.models.baseline.model import Baseline
+    from birdclef.experiment.contract import RunContext
+    from birdclef.loggers import CustomLogger, apply_logging_config, wandb_run
+    from birdclef.models.baseline.model import Baseline
 
     apply_logging_config(config.logging)
     logger = CustomLogger(f"baseline.rank{rank_zero_only.rank}", config=config.logging)

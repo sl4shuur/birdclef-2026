@@ -8,12 +8,12 @@ import pytest
 from click.testing import CliRunner
 from pydantic import SecretStr
 
-from kaggle_starter.config import TrackingConfig
+from birdclef.config import TrackingConfig
 
 
 @pytest.mark.parametrize("fail", [False, True])
 def test_wandb_run_reuses_saved_identity_and_finishes(tmp_path, monkeypatch, fail):
-    module = importlib.import_module("kaggle_starter.loggers.wandb")
+    module = importlib.import_module("birdclef.loggers.wandb")
     fake_wandb = SimpleNamespace(run=None, login=Mock())
     monkeypatch.setattr(module, "wandb", fake_wandb)
     opened = []
@@ -50,10 +50,10 @@ def test_wandb_run_reuses_saved_identity_and_finishes(tmp_path, monkeypatch, fai
 
 
 def test_fit_cli_passes_existing_wandb_wrapper_and_environment_secret(tmp_path, monkeypatch):
-    from kaggle_starter.models.baseline.fit import fit
-    from kaggle_starter.models.baseline.model import Baseline
+    from birdclef.models.baseline.fit import fit
+    from birdclef.models.baseline.model import Baseline
 
-    tracking_module = importlib.import_module("kaggle_starter.loggers.wandb")
+    tracking_module = importlib.import_module("birdclef.loggers.wandb")
     tracker = Mock()
     received = {}
 
@@ -63,8 +63,8 @@ def test_fit_cli_passes_existing_wandb_wrapper_and_environment_secret(tmp_path, 
         yield tracker
 
     monkeypatch.setattr(tracking_module, "wandb_run", wandb_run)
-    monkeypatch.setattr("kaggle_starter.loggers.apply_logging_config", Mock())
-    monkeypatch.setattr("kaggle_starter.loggers.CustomLogger", Mock())
+    monkeypatch.setattr("birdclef.loggers.apply_logging_config", Mock())
+    monkeypatch.setattr("birdclef.loggers.CustomLogger", Mock())
     train = Mock()
     monkeypatch.setattr(Baseline, "fit", train)
     monkeypatch.setenv("KS_TRACKING__API_KEY", "secret-from-environment")

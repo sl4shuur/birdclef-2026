@@ -4,7 +4,7 @@ from collections.abc import Mapping
 from datetime import datetime
 from typing import Any
 
-from kaggle_starter.config import LoggingConfig
+from birdclef.config import LoggingConfig
 
 from .logging_formatters import EvalFileFormatter
 

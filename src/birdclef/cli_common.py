@@ -6,7 +6,7 @@ from typing import Any
 
 import rich_click as click
 
-from kaggle_starter.config import Config
+from birdclef.config import Config
 
 CONTEXT_SETTINGS = {
     "help_option_names": ["-h", "--help"],

@@ -42,7 +42,7 @@ See the [Astral uv docs](https://docs.astral.sh/uv/) for more installation optio
 4. Inspect the configuration and check the local training runtime:
 
    ```bash
-   uv run src/kaggle_starter/config.py
+   uv run src/birdclef/config.py
    uv run --extra deep-learning scripts/check_runtime.py
    ```
 
@@ -62,7 +62,7 @@ See the [Astral uv docs](https://docs.astral.sh/uv/) for more installation optio
    # (macOS/Linux)
    source .venv/bin/activate
 
-   python src/kaggle_starter/config.py
+   python src/birdclef/config.py
    ```
 
 5. Open a starter notebook under `notebooks/local`, `notebooks/kaggle` or `notebooks/colab`. For local work, select the repository `.venv` kernel. Adapt the example cells and training workflow to your competition.
@@ -77,9 +77,9 @@ See the [Astral uv docs](https://docs.astral.sh/uv/) for more installation optio
 
 ## Template structure
 
-Application settings live in `src/kaggle_starter/config.py`; `.env.example` lists their environment variables. In notebooks, call `apply_environment_defaults()` before the first `get_config()` and set `KS_DATA__COMPETITION_DIR` to your data path.
+Application settings live in `src/birdclef/config.py`; `.env.example` lists their environment variables. In notebooks, call `apply_environment_defaults()` before the first `get_config()` and set `KS_DATA__COMPETITION_DIR` to your data path.
 
-| Folder under `src/kaggle_starter/` | Purpose |
+| Folder under `src/birdclef/` | Purpose |
 | --- | --- |
 | `core/` | Shared schemas and errors |
 | `data/`, `processing/` | Loading, splits, datasets and sample transformations |
@@ -88,7 +88,7 @@ Application settings live in `src/kaggle_starter/config.py`; `.env.example` list
 | `experiment/` | Run orchestration, artifacts and optional resume state |
 | `runtime/`, `loggers/` | Platform defaults, hardware settings and logging |
 
-`models/baseline/` contains a working Lightning regression example with checkpoints and resume; see [models/README.md](src/kaggle_starter/models/README.md) for its layout and commands. Adapt the data, model and metrics for each competition. The `experiment/` functions remain orchestration templates.
+`models/baseline/` contains a working Lightning regression example with checkpoints and resume; see [models/README.md](src/birdclef/models/README.md) for its layout and commands. Adapt the data, model and metrics for each competition. The `experiment/` functions remain orchestration templates.
 
 ## Kaggle and Colab packages
 
@@ -111,7 +111,7 @@ For Colab:
 uv run python -m scripts.colab.wheelhouse build
 ```
 
-Upload `build/kaggle-starter-colab.zip` and use the installation cell in `notebooks/colab/starter.ipynb`. Colab installs dependencies online. The wheel includes only `src/kaggle_starter`; `scripts/` stays in the repository.
+Upload `build/kaggle-starter-colab.zip` and use the installation cell in `notebooks/colab/starter.ipynb`. Colab installs dependencies online. The wheel includes only `src/birdclef`; `scripts/` stays in the repository.
 
 ## Pulling updates to existing project
 

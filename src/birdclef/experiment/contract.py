@@ -7,8 +7,8 @@ from pathlib import Path
 import pandas as pd
 from lightning.pytorch.loggers import Logger
 
-from kaggle_starter.core.schemas import Candidate
-from kaggle_starter.loggers import CustomLogger
+from birdclef.core.schemas import Candidate
+from birdclef.loggers import CustomLogger
 
 
 @dataclass(frozen=True)

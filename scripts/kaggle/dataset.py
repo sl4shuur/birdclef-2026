@@ -1,6 +1,6 @@
 import json
 
-from kaggle_starter.config import PROJECT_ROOT
+from birdclef.config import PROJECT_ROOT
 from scripts.kaggle.image import image_python
 from scripts.kaggle.shell import kaggle
 from scripts.wheelhouse_common import project_requirement, run

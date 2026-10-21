@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from kaggle_starter.config import PROJECT_ROOT
+from birdclef.config import PROJECT_ROOT
 from scripts.wheelhouse_common import run
 
 

@@ -4,7 +4,7 @@ import lightning as L
 import torch
 from torch.utils.data import DataLoader, Dataset
 
-from kaggle_starter.config import LoaderConfig
+from birdclef.config import LoaderConfig
 
 
 class TrainingDataModule(L.LightningDataModule):
