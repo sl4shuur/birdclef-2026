@@ -34,4 +34,4 @@ def build_wheel(stage: Path) -> str:
 
 
 def project_requirement(version: str) -> str:
-    return f"kaggle-starter[{','.join(EXTRAS)}]=={version}"
+    return f"birdclef[{','.join(EXTRAS)}]=={version}"

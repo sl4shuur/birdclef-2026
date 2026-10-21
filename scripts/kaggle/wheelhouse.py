@@ -70,7 +70,7 @@ def publish(message: str | None, dry_run: bool, create: bool) -> None:
 
     click.echo(f"Building the birdclef wheel in a fresh staging directory: {STAGE}...")
     version = build_wheel(STAGE)
-    click.secho(f"Built kaggle-starter=={version}.", fg="green")
+    click.secho(f"Built birdclef=={version}.", fg="green")
 
     click.echo("Resolving dependencies missing from the Kaggle image...")
     missing = missing_from_image()

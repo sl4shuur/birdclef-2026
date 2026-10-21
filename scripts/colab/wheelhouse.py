@@ -8,7 +8,7 @@ from birdclef.config import PROJECT_ROOT
 from scripts.wheelhouse_common import CONTEXT_SETTINGS, build_wheel, project_requirement
 
 STAGE = PROJECT_ROOT / "build" / "colab-wheelhouse"
-ARCHIVE = PROJECT_ROOT / "build" / "kaggle-starter-colab.zip"
+ARCHIVE = PROJECT_ROOT / "build" / "birdclef-colab.zip"
 
 
 @click.group(context_settings=CONTEXT_SETTINGS)

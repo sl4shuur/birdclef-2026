@@ -16,10 +16,10 @@ def pip_freeze_on_kaggle() -> str:
     if match is None:
         raise click.ClickException("Could not determine Kaggle username from `kaggle config view`.")
     user = match[1]
-    kernel = f"{user}/kaggle-starter-image-freeze"
+    kernel = f"{user}/birdclef-image-freeze"
     metadata = {
         "id": kernel,
-        "title": "kaggle-starter-image-freeze",
+        "title": "birdclef-image-freeze",
         "code_file": "script.py",
         "language": "python",
         "kernel_type": "script",

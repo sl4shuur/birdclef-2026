@@ -182,6 +182,66 @@ wheels = [
 ]
 
 [[package]]
+name = "birdclef-2026"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "numpy" },
+    { name = "pandas" },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
+    { name = "rich" },
+    { name = "rich-click" },
+]
+
+[package.optional-dependencies]
+deep-learning = [
+    { name = "lightning" },
+    { name = "torch" },
+    { name = "wandb" },
+]
+notebooks = [
+    { name = "ipykernel" },
+    { name = "ipywidgets" },
+    { name = "nbformat" },
+]
+parquet = [
+    { name = "pyarrow" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "build" },
+    { name = "pytest" },
+    { name = "ruff" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "ipykernel", marker = "extra == 'notebooks'", specifier = ">=6" },
+    { name = "ipywidgets", marker = "extra == 'notebooks'", specifier = ">=8" },
+    { name = "lightning", marker = "extra == 'deep-learning'", specifier = ">=2.6" },
+    { name = "nbformat", marker = "extra == 'notebooks'", specifier = ">=5" },
+    { name = "numpy", specifier = ">=2.0" },
+    { name = "pandas", specifier = ">=2.0" },
+    { name = "pyarrow", marker = "extra == 'parquet'", specifier = ">=15" },
+    { name = "pydantic", specifier = ">=2.7" },
+    { name = "pydantic-settings", specifier = ">=2.5" },
+    { name = "rich", specifier = ">=13.9" },
+    { name = "rich-click", specifier = ">=1.9.7" },
+    { name = "torch", marker = "extra == 'deep-learning'", specifier = ">=2.11", index = "https://download.pytorch.org/whl/cu128" },
+    { name = "wandb", marker = "extra == 'deep-learning'", specifier = ">=0.31.0" },
+]
+provides-extras = ["parquet", "notebooks", "deep-learning"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "build", specifier = ">=1.2" },
+    { name = "pytest", specifier = ">=8" },
+    { name = "ruff", specifier = ">=0.8" },
+]
+
+[[package]]
 name = "build"
 version = "1.6.1"
 source = { registry = "https://pypi.org/simple" }
@@ -919,66 +979,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/21/8b/e739cf9066ad5037a2d4b0a403f06da374fdccb9748221661c8b492d3dbc/jupyterlab_widgets-3.0.17.tar.gz", hash = "sha256:6e61fe21ca8a66039180a5cc52a433e07279d2fee79c8be963e00d55193f17a8", size = 213919, upload-time = "2026-08-18T08:52:17.511Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/33/ef/6d27fc118f58cb24886da413545a7efb0853d405fddbfd8b2d9ac09fbed4/jupyterlab_widgets-3.0.17-py3-none-any.whl", hash = "sha256:40ac1e9955acf116c4d995d9bfa082d86ad9ec6d91c4f134827cf5e0a5eb75e0", size = 217292, upload-time = "2026-08-18T08:52:15.47Z" },
-]
-
-[[package]]
-name = "kaggle-starter"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "numpy" },
-    { name = "pandas" },
-    { name = "pydantic" },
-    { name = "pydantic-settings" },
-    { name = "rich" },
-    { name = "rich-click" },
-]
-
-[package.optional-dependencies]
-deep-learning = [
-    { name = "lightning" },
-    { name = "torch" },
-    { name = "wandb" },
-]
-notebooks = [
-    { name = "ipykernel" },
-    { name = "ipywidgets" },
-    { name = "nbformat" },
-]
-parquet = [
-    { name = "pyarrow" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "build" },
-    { name = "pytest" },
-    { name = "ruff" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "ipykernel", marker = "extra == 'notebooks'", specifier = ">=6" },
-    { name = "ipywidgets", marker = "extra == 'notebooks'", specifier = ">=8" },
-    { name = "lightning", marker = "extra == 'deep-learning'", specifier = ">=2.6" },
-    { name = "nbformat", marker = "extra == 'notebooks'", specifier = ">=5" },
-    { name = "numpy", specifier = ">=2.0" },
-    { name = "pandas", specifier = ">=2.0" },
-    { name = "pyarrow", marker = "extra == 'parquet'", specifier = ">=15" },
-    { name = "pydantic", specifier = ">=2.7" },
-    { name = "pydantic-settings", specifier = ">=2.5" },
-    { name = "rich", specifier = ">=13.9" },
-    { name = "rich-click", specifier = ">=1.9.7" },
-    { name = "torch", marker = "extra == 'deep-learning'", specifier = ">=2.11", index = "https://download.pytorch.org/whl/cu128" },
-    { name = "wandb", marker = "extra == 'deep-learning'", specifier = ">=0.31.0" },
-]
-provides-extras = ["parquet", "notebooks", "deep-learning"]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "build", specifier = ">=1.2" },
-    { name = "pytest", specifier = ">=8" },
-    { name = "ruff", specifier = ">=0.8" },
 ]
 
 [[package]]

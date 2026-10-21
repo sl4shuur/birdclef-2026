@@ -101,7 +101,7 @@ def test_dataset_requirements_include_notebook_extras(scripts, monkeypatch, tmp_
     monkeypatch.setattr(scripts["dataset"], "STAGE", tmp_path)
     monkeypatch.setattr(scripts["dataset"], "DATASET", "user/wheels")
     requirements = scripts["dataset"].write_dataset_files("0.1.0", {"lightning": "2.5.0"})
-    assert requirements == "kaggle-starter[notebooks,deep-learning]==0.1.0\nlightning==2.5.0\n"
+    assert requirements == "birdclef[notebooks,deep-learning]==0.1.0\nlightning==2.5.0\n"
     assert json.loads((tmp_path / "dataset-metadata.json").read_text())["id"] == "user/wheels"
 
 
