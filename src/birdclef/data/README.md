@@ -1,8 +1,7 @@
 # Data
 
-Implement loading competition files, creating validation splits and assembling
-datasets and data loaders here. Add a Lightning DataModule only if needed.
+`labels.encode_labels` builds multi-hot targets for focal recordings in sample class order.
+`split.group_holdout` holds out a fraction of unique recording groups, keeping all rows of each group together. It returns train/val frames and a manifest with the group column and keys.The helper is unstratified and takes explicit arguments, not automatic settings.
+`birdclef.competition.soundscape_windows` creates official 5-second window manifests.
 
-Keep split membership reproducible and prevent leakage between training and
-validation. Reuse sample transformations from `processing/`; keep model training
-and metric calculation in their own modules.
+Audio decoding, transformations and temporal soundscape label preparation remain future work. Keep model training and metric calculation in their own modules. See the root README for usage.
