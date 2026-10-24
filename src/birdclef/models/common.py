@@ -11,7 +11,7 @@ from birdclef.config import LRSchedulerConfig
 type TrainingBatch = tuple[torch.Tensor, torch.Tensor]
 
 
-class KaggleModule(L.LightningModule, ABC):
+class BirdClefModule(L.LightningModule, ABC):
     """Default batches are (inputs, targets); prediction batches are input tensors.
 
     Override the step methods for other batch layouts or task-specific metrics.

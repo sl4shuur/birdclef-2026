@@ -1,9 +1,7 @@
 # Submission
 
-Implement building, validating and writing the competition's submission file here.
-Use the sample submission and competition rules to define columns, IDs, row order,
-prediction format and any required postprocessing.
+- `build.build_submission(predictions, template)` aligns explicit IDs and species to a template.
+- `format.validate_submission(submission, template)` checks exact order, IDs and probabilities.
+- `write.write_submission(submission, path, template)` validates, then writes the assembled CSV.
 
-Check for missing or duplicate IDs, invalid values and incorrect shapes before
-saving. Reuse postprocessing from validation when appropriate so local scores
-reflect the predictions you submit. Save the final file in the run's output folder.
+No clipping or filling. Hidden inference templates must use actual soundscape IDs; visible sample rows are placeholders. See the root README for an example.

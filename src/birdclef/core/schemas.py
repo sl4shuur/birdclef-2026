@@ -3,23 +3,8 @@
 from hashlib import sha256
 from typing import Literal, Self
 
-import numpy as np
 import pandas as pd
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator
-
-
-class Candidate(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    # Higher ranks first
-    score: float
-
-    @field_validator("score")
-    @classmethod
-    def _not_nan(cls, score: float) -> float:
-        if np.isnan(score):
-            raise ValueError("score must not be NaN.")
-        return score
+from pydantic import BaseModel, ConfigDict, model_validator
 
 
 class SplitManifest(BaseModel):
@@ -27,6 +12,7 @@ class SplitManifest(BaseModel):
 
     version: Literal[1] = 1
     dataset_id: str
+    group_column: str = "filename"
     seed: int
     train_keys: list[str]
     val_keys: list[str]

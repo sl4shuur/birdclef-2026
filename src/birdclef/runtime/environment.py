@@ -10,16 +10,16 @@ type Environment = Literal["kaggle", "colab", "local"]
 _DEFAULTS: dict[Environment, dict[str, str]] = {
     # Adjust the input and Drive paths for your competition; mount Drive in Colab first.
     "kaggle": {
-        "KS_DATA__COMPETITION_DIR": "/kaggle/input/competitions/your-competition",
-        "KS_DATA__OUTPUT_DIR": "/kaggle/working",
-        "KS_LOGGING__DIRECTORY": "/kaggle/working/logs",
-        "KS_LOADER__PIN_MEMORY": "true",
+        "BCLEF_DATA__COMPETITION_DIR": "/kaggle/input/competitions/birdclef-2026",
+        "BCLEF_DATA__OUTPUT_DIR": "/kaggle/working",
+        "BCLEF_LOGGING__DIRECTORY": "/kaggle/working/logs",
+        "BCLEF_LOADER__PIN_MEMORY": "true",
     },
     "colab": {
-        "KS_DATA__COMPETITION_DIR": "/content/drive/MyDrive/data/competition",
-        "KS_DATA__OUTPUT_DIR": "/content/drive/MyDrive/outputs",
-        "KS_LOGGING__DIRECTORY": "/content/drive/MyDrive/outputs/logs",
-        "KS_LOADER__PIN_MEMORY": "true",
+        "BCLEF_DATA__COMPETITION_DIR": "/content/drive/MyDrive/data/competition",
+        "BCLEF_DATA__OUTPUT_DIR": "/content/drive/MyDrive/outputs",
+        "BCLEF_LOGGING__DIRECTORY": "/content/drive/MyDrive/outputs/logs",
+        "BCLEF_LOADER__PIN_MEMORY": "true",
     },
     "local": {},
 }

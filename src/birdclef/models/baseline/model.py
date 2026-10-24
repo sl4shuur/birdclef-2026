@@ -1,4 +1,4 @@
-"""DataFrame adapter around the Lightning module; owns example-specific data preparation."""
+"""Feature-based MLP lifecycle; tensor preparation belongs to birdclef.data."""
 
 import hashlib
 import json
@@ -6,22 +6,21 @@ from pathlib import Path
 from typing import Self
 
 import lightning as L
-import numpy as np
 import pandas as pd
-import torch
 from lightning.pytorch.utilities import rank_zero_only
-from torch.utils.data import TensorDataset
 
-from birdclef.core.schemas import Candidate
+from birdclef.competition import ROW_ID
 from birdclef.data.datamodule import TrainingDataModule, prediction_dataloader
-from birdclef.experiment.contract import KaggleModel, RunContext
+from birdclef.data.features import FeatureDataset, multilabel_dataset
+from birdclef.experiment.contract import BirdClefModel, RunContext
 from birdclef.models.baseline.config import BaselineExperimentConfig
 from birdclef.models.baseline.network import BaselineModule
 from birdclef.models.checkpoints import read_fit_state
 from birdclef.models.trainer import fit_module, predict_module
+from birdclef.submission.format import validate_row_ids
 
 
-class Baseline(KaggleModel):
+class Baseline(BirdClefModel):
     def __init__(self, config: BaselineExperimentConfig) -> None:
         self.config = config
         self._module: BaselineModule | None = None
@@ -48,8 +47,16 @@ class Baseline(KaggleModel):
             raise ValueError("Training and validation frames must be nonempty.")
         L.seed_everything(config.train.seed, workers=True)
         data = TrainingDataModule(
-            self._dataset(train),
-            self._dataset(valid),
+            multilabel_dataset(
+                train,
+                feature_columns=config.model.feature_columns,
+                target_columns=config.model.target_columns,
+            ),
+            multilabel_dataset(
+                valid,
+                feature_columns=config.model.feature_columns,
+                target_columns=config.model.target_columns,
+            ),
             config=config.loader,
         )
         self._check_inputs(train, valid, context)
@@ -64,36 +71,26 @@ class Baseline(KaggleModel):
             run=context,
         )
 
-    def predict(self, frame: pd.DataFrame, context: RunContext | None = None) -> list[Candidate]:
+    def predict(self, frame: pd.DataFrame, context: RunContext | None = None) -> pd.DataFrame:
         if self._module is None or self._best is None:
             raise RuntimeError("Call fit() or from_run() before predict().")
+        ids = frame[ROW_ID]
+        columns = self.config.model.target_columns
         if frame.empty:
-            return []
-        loader = prediction_dataloader(self._features(frame), config=self.config.loader)
+            return pd.DataFrame(columns=[ROW_ID, *columns])
+        validate_row_ids(frame)
+        loader = prediction_dataloader(
+            FeatureDataset(frame, self.config.model.feature_columns), config=self.config.loader
+        )
         predictions = predict_module(
             self._module,
             loader,
             runtime=self.config.runtime,
             best=self._best,
         )
-        # Candidate.score is the template's scalar-output contract. Replace for other tasks.
-        return [Candidate(score=float(value)) for value in predictions]
-
-    def _features(self, frame: pd.DataFrame) -> torch.Tensor:
-        return self._tensor(frame[self.config.model.feature_columns])
-
-    def _dataset(self, frame: pd.DataFrame) -> TensorDataset:
-        return TensorDataset(
-            self._features(frame),
-            self._tensor(frame[self.config.model.target_column]),
-        )
-
-    @staticmethod
-    def _tensor(values: pd.DataFrame | pd.Series) -> torch.Tensor:
-        array = values.to_numpy(dtype=np.float32, copy=True)
-        if not np.isfinite(array).all():
-            raise ValueError("The example requires finite numeric features and targets.")
-        return torch.from_numpy(array)
+        result = pd.DataFrame(predictions.float().numpy(), columns=columns)
+        result.insert(0, ROW_ID, ids.to_numpy())
+        return result
 
     def _check_inputs(self, train: pd.DataFrame, valid: pd.DataFrame, context: RunContext) -> None:
         """Refuse changed data/settings; only epoch budget and checkpoint count may change."""
@@ -103,7 +100,7 @@ class Baseline(KaggleModel):
         settings = {key: settings[key] for key in keys}
         for key in ("max_epochs", "checkpoint_top_k"):
             settings["train"].pop(key)
-        columns = [*self.config.model.feature_columns, self.config.model.target_column]
+        columns = [*self.config.model.feature_columns, *self.config.model.target_columns]
         checksums = [
             hashlib.sha256(
                 pd.util.hash_pandas_object(df[columns], index=True).values.tobytes()

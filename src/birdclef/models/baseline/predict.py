@@ -1,4 +1,4 @@
-"""Raw scalar predictions from a saved run; competition scoring/submission is added later."""
+"""Species probabilities from a saved feature-based multilabel MLP."""
 
 from pathlib import Path
 
@@ -14,7 +14,7 @@ from birdclef.models.baseline.config import BaselineExperimentConfig
 @click.option("--output", type=click.Path(path_type=Path, dir_okay=False), required=True)
 @click.option("--accelerator", type=click.Choice(["auto", "cpu", "gpu"]), default="auto")
 def predict(run: Path, input_path: Path, output: Path, accelerator: str) -> None:
-    """Write raw scores in input-row order. This file is not a formatted Kaggle submission."""
+    """Write row_id and species probabilities; validate with submission.format."""
     config = load_config(run / "model-config.json", BaselineExperimentConfig)
     config.runtime = config.runtime.model_copy(update={"accelerator": accelerator, "devices": 1})
 
@@ -25,10 +25,7 @@ def predict(run: Path, input_path: Path, output: Path, accelerator: str) -> None
     try:
         predictions = Baseline.from_run(run, config=config).predict(pd.read_csv(input_path))
         output.parent.mkdir(parents=True, exist_ok=True)
-        pd.DataFrame({"score": [prediction.score for prediction in predictions]}).to_csv(
-            output,
-            index=False,
-        )
+        predictions.to_csv(output, index=False)
     except (OSError, ValueError, KeyError) as error:
         raise click.ClickException(str(error)) from error
     click.echo(f"Saved predictions: {output}")

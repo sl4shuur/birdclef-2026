@@ -4,7 +4,7 @@ A deep-learning project for the [BirdCLEF+ 2026 Kaggle competition](https://www.
 
 ![Angry Bird Red](https://media1.tenor.com/m/IZqylGLe1PwAAAAC/angry-bird-angry-bird-red.gif)
 
-The task is **multi-label audio classification**: predict the presence of 234 animal classes in 5-second soundscape segments, evaluated using macro-averaged ROC-AUC.
+The task is **multi-label audio classification**: predict the presence of 234 animal classes in 5-second soundscape segments, evaluated using macro-averaged ROC-AUC excluding classes without positive targets.
 
 The project supports **local, Kaggle, and Google Colab** workflows, with modular training, evaluation, and inference pipelines.
 
@@ -15,7 +15,8 @@ The project supports **local, Kaggle, and Google Colab** workflows, with modular
 - [ ] Perform EDA: class distributions, audio characteristics, labels, sites, and data quality.
 - [ ] Explore additional publicly available audio datasets and pretrained models.
 - [ ] Design modular, readable, and scalable training and inference pipelines.
-- [ ] Implement data preprocessing, validation splits, and evaluation metrics.
+- [x] Add label encoding, recording-level holdout, competition metric, and submission tools.
+- [ ] Implement audio preprocessing and select a baseline validation protocol.
 - [ ] Train a baseline model and implement CPU-compatible inference.
 - [ ] Submit the baseline to Kaggle and record the leaderboard score.
 
@@ -98,7 +99,7 @@ uv run pytest
 
 Configuration is managed through `src/birdclef/config.py` and `.env`.
 
-The repository initially includes a Lightning regression example in `models/baseline/`, which serves as a structural reference rather than a BirdCLEF-specific model.
+`models/baseline/` contains a multilabel MLP for precomputed numeric features: BCE with logits for training, sigmoid probabilities for inference. Audio decoding, features and an acoustic model are future work. The generic experiment lifecycle files still contain explicit stubs; working MLP entry points are `birdclef.models.baseline.fit` and `birdclef.models.baseline.predict`.
 
 ## Kaggle & Colab
 
