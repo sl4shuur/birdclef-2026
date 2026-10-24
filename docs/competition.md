@@ -18,7 +18,7 @@ Each prediction covers five seconds. IDs use `<filename_stem>_<end_second>`: the
 
 Maximize macro ROC-AUC after excluding classes without positive targets. Per-class AUC compares positive and negative rankings, giving ties half credit. Class scores receive equal weight. Compute over the entire validation set.
 
-The local `score` follows the organizer notebook and calls scikit-learn directly, without Kaggle utilities. It expects aligned rows and does not mutate inputs. No-positive classes are excluded; an entirely negative validation set raises ValueError. Other undefined-AUC behavior is inherited from the installed scikit-learn version. Inspect split coverage.
+The local `score` follows the organizer notebook and calls scikit-learn directly, without Kaggle utilities. It checks matching, unique row IDs and does not mutate inputs. No-positive classes are excluded. An entirely negative validation set or any class without negative examples raises ValueError, so undefined AUC is not saved as NaN. Inspect split coverage.
 
 ## Inference requirements
 

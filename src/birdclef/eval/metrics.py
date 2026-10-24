@@ -12,12 +12,24 @@ def score(
 ) -> float:
     """Macro ROC-AUC excluding classes with no positive labels.
 
-    As in the organizer metric, rows must already be aligned. Unlike its notebook,
-    this function does not mutate inputs and uses ValueError for input errors.
-    Undefined AUC and other scoring errors follow scikit-learn's behavior.
+    Rows must have matching, unique IDs in the same order. Classes without
+    positives are skipped; classes without negatives raise ValueError because
+    their AUC is undefined. Inputs are not mutated. Scores may be logits.
     """
+    if not solution.columns.is_unique or not submission.columns.is_unique:
+        raise ValueError("Solution and submission columns must be unique.")
+    for frame in (solution, submission):
+        ids = frame[row_id_column_name]
+        if ids.isna().any() or ids.duplicated().any():
+            raise ValueError("Solution and submission row IDs must be nonnull and unique.")
+    if solution[row_id_column_name].tolist() != submission[row_id_column_name].tolist():
+        raise ValueError("Solution and submission must have aligned row IDs.")
     solution = solution.drop(columns=row_id_column_name)
     submission = submission.drop(columns=row_id_column_name)
+    if set(solution.columns) != set(submission.columns):
+        raise ValueError("Solution and submission must have the same species columns.")
+    if not solution.isin([0, 1]).to_numpy().all():
+        raise ValueError("Solution labels must be binary and nonnull.")
 
     if not is_numeric_dtype(submission.values):
         bad_dtypes = {
@@ -31,6 +43,11 @@ def score(
     scored_columns = list(solution_sums[solution_sums > 0].index.values)
     if not scored_columns:
         raise ValueError("ROC-AUC requires at least one class with positive labels.")
+    without_negatives = list(solution_sums[solution_sums == len(solution)].index)
+    if without_negatives:
+        raise ValueError(
+            f"ROC-AUC is undefined for classes without negative labels: {without_negatives}"
+        )
 
     return float(
         roc_auc_score(
