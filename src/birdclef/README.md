@@ -1,9 +1,5 @@
-# Source code Folder
+# BirdCLEF package
 
-This folder contains the source code for the project. It is organized into subfolders based on functionality, such as:
+Competition conventions live in `competition.py`; labels/splits in `data/`, AUC in `eval/`, and submission assembly/checks in `submission/`. Models implement `BirdClefModel`.
 
-- `interfaces/`: Contains interface definitions for various components of the project.
-- `adapters/`: Contains adapter classes (realizations of the interfaces) that implement the functionality defined in the interfaces.
-- and other relevant subfolders as needed.
-
-Each subfolder may contain multiple files, each responsible for a specific aspect of the functionality. The code is structured to promote modularity and maintainability, allowing for easy updates and enhancements in the future.
+The example multilabel MLP uses shared Lightning training and checkpoint utilities. The root README documents commands, contracts and remaining audio-model work.
