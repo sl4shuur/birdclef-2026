@@ -10,7 +10,8 @@ def main() -> None:
     cfg = resolve_runtime(Config().runtime)
     trainer = L.Trainer(**cfg.model_dump(), logger=False, enable_checkpointing=False)
     print(
-        f"{type(trainer.accelerator).__name__}; {trainer.num_devices} device(s); {trainer.precision}"
+        f"{type(trainer.accelerator).__name__}; "
+        f"{trainer.num_devices} device(s); {trainer.precision}"
     )
 
 

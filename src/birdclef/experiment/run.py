@@ -7,12 +7,12 @@ from pathlib import Path
 
 from birdclef.config import Config
 from birdclef.core.schemas import DataSplit
-from birdclef.experiment.contract import KaggleModel
+from birdclef.experiment.contract import BirdClefModel
 from birdclef.loggers import CustomLogger
 
 
 def run_experiment(
-    model: KaggleModel, split: DataSplit, *, config: Config, name: str, logger: CustomLogger
+    model: BirdClefModel, split: DataSplit, *, config: Config, name: str, logger: CustomLogger
 ) -> Path:
     """Train and validate, then return the run's output directory.
 

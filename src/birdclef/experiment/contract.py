@@ -7,7 +7,6 @@ from pathlib import Path
 import pandas as pd
 from lightning.pytorch.loggers import Logger
 
-from birdclef.core.schemas import Candidate
 from birdclef.loggers import CustomLogger
 
 
@@ -20,11 +19,16 @@ class RunContext:
     protocol: str
 
 
-class KaggleModel(ABC):
+class BirdClefModel(ABC):
     @abstractmethod
     def fit(self, train: pd.DataFrame, valid: pd.DataFrame, context: RunContext) -> None:
         """Train on the supplied split; save reusable artifacts inside context.output_dir."""
 
     @abstractmethod
-    def predict(self, frame: pd.DataFrame, context: RunContext) -> list[Candidate]:
-        """Return one scalar Candidate per input row in the same order; extend for other tasks."""
+    def predict(self, frame: pd.DataFrame, context: RunContext | None = None) -> pd.DataFrame:
+        """Return row_id and species probabilities for each input 5-second window.
+
+        Input rows have unique row_id values; output preserves their order.
+        Species columns follow the sample submission. Models own audio loading
+        and preprocessing; callers own the window manifest and submission checks.
+        """
