@@ -12,16 +12,16 @@ import torch
 from lightning.pytorch.utilities import rank_zero_only
 from torch.utils.data import TensorDataset
 
-from birdclef.core.schemas import Candidate
+from birdclef.competition import ROW_ID
 from birdclef.data.datamodule import TrainingDataModule, prediction_dataloader
-from birdclef.experiment.contract import KaggleModel, RunContext
+from birdclef.experiment.contract import BirdClefModel, RunContext
 from birdclef.models.baseline.config import BaselineExperimentConfig
 from birdclef.models.baseline.network import BaselineModule
 from birdclef.models.checkpoints import read_fit_state
 from birdclef.models.trainer import fit_module, predict_module
 
 
-class Baseline(KaggleModel):
+class Baseline(BirdClefModel):
     def __init__(self, config: BaselineExperimentConfig) -> None:
         self.config = config
         self._module: BaselineModule | None = None
@@ -64,11 +64,18 @@ class Baseline(KaggleModel):
             run=context,
         )
 
-    def predict(self, frame: pd.DataFrame, context: RunContext | None = None) -> list[Candidate]:
+    def predict(self, frame: pd.DataFrame, context: RunContext | None = None) -> pd.DataFrame:
         if self._module is None or self._best is None:
             raise RuntimeError("Call fit() or from_run() before predict().")
+        ids = frame[ROW_ID]
+        if (
+            ids.duplicated().any()
+            or not ids.map(lambda value: isinstance(value, str) and bool(value.strip())).all()
+        ):
+            raise ValueError("Prediction rows require unique, nonempty row_id strings.")
+        columns = self.config.model.target_columns
         if frame.empty:
-            return []
+            return pd.DataFrame(columns=[ROW_ID, *columns])
         loader = prediction_dataloader(self._features(frame), config=self.config.loader)
         predictions = predict_module(
             self._module,
@@ -76,16 +83,20 @@ class Baseline(KaggleModel):
             runtime=self.config.runtime,
             best=self._best,
         )
-        # Candidate.score is the template's scalar-output contract. Replace for other tasks.
-        return [Candidate(score=float(value)) for value in predictions]
+        result = pd.DataFrame(predictions.float().numpy(), columns=columns)
+        result.insert(0, ROW_ID, ids.to_numpy())
+        return result
 
     def _features(self, frame: pd.DataFrame) -> torch.Tensor:
         return self._tensor(frame[self.config.model.feature_columns])
 
     def _dataset(self, frame: pd.DataFrame) -> TensorDataset:
+        targets = self._tensor(frame[self.config.model.target_columns])
+        if not ((targets == 0) | (targets == 1)).all():
+            raise ValueError("Multilabel training targets must be binary.")
         return TensorDataset(
             self._features(frame),
-            self._tensor(frame[self.config.model.target_column]),
+            targets,
         )
 
     @staticmethod
@@ -103,7 +114,7 @@ class Baseline(KaggleModel):
         settings = {key: settings[key] for key in keys}
         for key in ("max_epochs", "checkpoint_top_k"):
             settings["train"].pop(key)
-        columns = [*self.config.model.feature_columns, self.config.model.target_column]
+        columns = [*self.config.model.feature_columns, *self.config.model.target_columns]
         checksums = [
             hashlib.sha256(
                 pd.util.hash_pandas_object(df[columns], index=True).values.tobytes()
