@@ -13,9 +13,7 @@ from rich.text import Text
 
 def _project_root() -> Path:
     for candidate in Path(__file__).resolve().parents:
-        if (candidate / "pyproject.toml").exists() and (
-            candidate / "src" / "birdclef"
-        ).exists():
+        if (candidate / "pyproject.toml").exists() and (candidate / "src" / "birdclef").exists():
             return candidate
     return Path.cwd()
 
@@ -75,7 +73,7 @@ class SplitConfig(ConfigModel):
 
 
 class TrackingConfig(ConfigModel):
-    project: str = "kaggle-experiments"
+    project: str = "birdclef-2026"
     entity: str | None = None
     offline: bool = True
     api_key: SecretStr | None = None
