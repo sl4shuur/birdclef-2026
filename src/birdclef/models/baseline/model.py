@@ -1,4 +1,4 @@
-"""DataFrame adapter around the Lightning module; owns example-specific data preparation."""
+"""Feature-based MLP lifecycle; tensor preparation belongs to birdclef.data."""
 
 import hashlib
 import json
@@ -6,14 +6,12 @@ from pathlib import Path
 from typing import Self
 
 import lightning as L
-import numpy as np
 import pandas as pd
-import torch
 from lightning.pytorch.utilities import rank_zero_only
-from torch.utils.data import TensorDataset
 
 from birdclef.competition import ROW_ID
 from birdclef.data.datamodule import TrainingDataModule, prediction_dataloader
+from birdclef.data.features import FeatureDataset, multilabel_dataset
 from birdclef.experiment.contract import BirdClefModel, RunContext
 from birdclef.models.baseline.config import BaselineExperimentConfig
 from birdclef.models.baseline.network import BaselineModule
@@ -49,8 +47,16 @@ class Baseline(BirdClefModel):
             raise ValueError("Training and validation frames must be nonempty.")
         L.seed_everything(config.train.seed, workers=True)
         data = TrainingDataModule(
-            self._dataset(train),
-            self._dataset(valid),
+            multilabel_dataset(
+                train,
+                feature_columns=config.model.feature_columns,
+                target_columns=config.model.target_columns,
+            ),
+            multilabel_dataset(
+                valid,
+                feature_columns=config.model.feature_columns,
+                target_columns=config.model.target_columns,
+            ),
             config=config.loader,
         )
         self._check_inputs(train, valid, context)
@@ -73,7 +79,9 @@ class Baseline(BirdClefModel):
         if frame.empty:
             return pd.DataFrame(columns=[ROW_ID, *columns])
         validate_row_ids(frame)
-        loader = prediction_dataloader(self._features(frame), config=self.config.loader)
+        loader = prediction_dataloader(
+            FeatureDataset(frame, self.config.model.feature_columns), config=self.config.loader
+        )
         predictions = predict_module(
             self._module,
             loader,
@@ -83,25 +91,6 @@ class Baseline(BirdClefModel):
         result = pd.DataFrame(predictions.float().numpy(), columns=columns)
         result.insert(0, ROW_ID, ids.to_numpy())
         return result
-
-    def _features(self, frame: pd.DataFrame) -> torch.Tensor:
-        return self._tensor(frame[self.config.model.feature_columns])
-
-    def _dataset(self, frame: pd.DataFrame) -> TensorDataset:
-        targets = self._tensor(frame[self.config.model.target_columns])
-        if not ((targets == 0) | (targets == 1)).all():
-            raise ValueError("Multilabel training targets must be binary.")
-        return TensorDataset(
-            self._features(frame),
-            targets,
-        )
-
-    @staticmethod
-    def _tensor(values: pd.DataFrame | pd.Series) -> torch.Tensor:
-        array = values.to_numpy(dtype=np.float32, copy=True)
-        if not np.isfinite(array).all():
-            raise ValueError("The example requires finite numeric features and targets.")
-        return torch.from_numpy(array)
 
     def _check_inputs(self, train: pd.DataFrame, valid: pd.DataFrame, context: RunContext) -> None:
         """Refuse changed data/settings; only epoch budget and checkpoint count may change."""

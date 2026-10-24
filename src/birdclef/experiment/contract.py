@@ -29,6 +29,8 @@ class BirdClefModel(ABC):
         """Return row_id and species probabilities for each input 5-second window.
 
         Input rows have unique row_id values; output preserves their order.
-        Species columns follow the sample submission. Models own audio loading
-        and preprocessing; callers own the window manifest and submission checks.
+        Species columns follow the sample submission. Dataset code owns sample
+        construction, audio loading, crop/target rules and conversion to tensors.
+        Models own learned computation and may include differentiable transforms.
+        Callers own the window manifest and submission checks.
         """
