@@ -16,7 +16,9 @@ def class_columns(sample: pd.DataFrame) -> list[str]:
     columns = sample.columns.tolist()
     if not columns or columns[0] != ROW_ID or len(columns) < 2:
         raise ValueError("Expected row_id followed by species columns.")
-    if not sample.columns.is_unique or any(not isinstance(c, str) or not c for c in columns):
+    if not sample.columns.is_unique or any(
+        not isinstance(c, str) or not c.strip() for c in columns
+    ):
         raise ValueError("Submission columns must be unique, nonempty strings.")
     return columns[1:]
 

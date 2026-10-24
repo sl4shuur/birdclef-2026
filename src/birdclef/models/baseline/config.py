@@ -2,6 +2,7 @@
 
 from pydantic import Field, model_validator
 
+from birdclef.competition import ROW_ID
 from birdclef.config import Config, ConfigModel
 
 
@@ -22,7 +23,7 @@ class ModelConfig(ConfigModel):
             raise ValueError("Target columns must be unique.")
         if set(self.target_columns) & set(self.feature_columns):
             raise ValueError("Target columns must not be used as input features.")
-        if any(not c.strip() or c == "row_id" for c in self.feature_columns + self.target_columns):
+        if any(not c.strip() or c == ROW_ID for c in self.feature_columns + self.target_columns):
             raise ValueError("Feature/target names must be nonempty and must not be row_id.")
         return self
 

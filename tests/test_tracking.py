@@ -53,7 +53,6 @@ def test_fit_cli_passes_existing_wandb_wrapper_and_environment_secret(tmp_path, 
     from birdclef.models.baseline.fit import fit
     from birdclef.models.baseline.model import Baseline
 
-    tracking_module = importlib.import_module("birdclef.loggers.wandb")
     tracker = Mock()
     received = {}
 
@@ -62,12 +61,12 @@ def test_fit_cli_passes_existing_wandb_wrapper_and_environment_secret(tmp_path, 
         received.update(config=config, name=name, save_dir=save_dir)
         yield tracker
 
-    monkeypatch.setattr(tracking_module, "wandb_run", wandb_run)
+    monkeypatch.setattr("birdclef.loggers.wandb_run", wandb_run)
     monkeypatch.setattr("birdclef.loggers.apply_logging_config", Mock())
     monkeypatch.setattr("birdclef.loggers.CustomLogger", Mock())
     train = Mock()
     monkeypatch.setattr(Baseline, "fit", train)
-    monkeypatch.setenv("KS_TRACKING__API_KEY", "secret-from-environment")
+    monkeypatch.setenv("BCLEF_TRACKING__API_KEY", "secret-from-environment")
     config_path = tmp_path / "config.json"
     config_path.write_text(
         json.dumps(
@@ -78,7 +77,7 @@ def test_fit_cli_passes_existing_wandb_wrapper_and_environment_secret(tmp_path, 
         )
     )
     data = tmp_path / "data.csv"
-    data.write_text("feature,target\n1,2\n")
+    data.write_text("feature,target\n1,1\n")
     result = CliRunner().invoke(
         fit,
         [

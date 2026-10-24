@@ -19,6 +19,7 @@ from birdclef.models.baseline.config import BaselineExperimentConfig
 from birdclef.models.baseline.network import BaselineModule
 from birdclef.models.checkpoints import read_fit_state
 from birdclef.models.trainer import fit_module, predict_module
+from birdclef.submission.format import validate_row_ids
 
 
 class Baseline(BirdClefModel):
@@ -68,14 +69,10 @@ class Baseline(BirdClefModel):
         if self._module is None or self._best is None:
             raise RuntimeError("Call fit() or from_run() before predict().")
         ids = frame[ROW_ID]
-        if (
-            ids.duplicated().any()
-            or not ids.map(lambda value: isinstance(value, str) and bool(value.strip())).all()
-        ):
-            raise ValueError("Prediction rows require unique, nonempty row_id strings.")
         columns = self.config.model.target_columns
         if frame.empty:
             return pd.DataFrame(columns=[ROW_ID, *columns])
+        validate_row_ids(frame)
         loader = prediction_dataloader(self._features(frame), config=self.config.loader)
         predictions = predict_module(
             self._module,

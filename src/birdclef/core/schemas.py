@@ -12,6 +12,7 @@ class SplitManifest(BaseModel):
 
     version: Literal[1] = 1
     dataset_id: str
+    group_column: str = "filename"
     seed: int
     train_keys: list[str]
     val_keys: list[str]

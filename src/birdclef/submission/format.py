@@ -30,7 +30,11 @@ def validate_submission(submission: pd.DataFrame, template: pd.DataFrame) -> Non
     validate_row_ids(submission)
     if submission[ROW_ID].tolist() != template[ROW_ID].tolist():
         raise ValueError("Submission row IDs or their order differ from the template.")
-    if any(not pd.api.types.is_numeric_dtype(submission[c]) for c in classes):
+    if any(
+        not pd.api.types.is_numeric_dtype(submission[c])
+        or pd.api.types.is_complex_dtype(submission[c])
+        for c in classes
+    ):
         raise ValueError("Predictions must be numeric probabilities.")
     values = submission[classes].to_numpy(dtype=float, na_value=np.nan)
     if not np.isfinite(values).all() or ((values < 0) | (values > 1)).any():
