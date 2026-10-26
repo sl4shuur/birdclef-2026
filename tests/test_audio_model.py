@@ -10,6 +10,8 @@ pytest.importorskip("torchvision")
 lightning = pytest.importorskip("lightning")
 sf = pytest.importorskip("soundfile")
 
+from torch import nn  # noqa: E402
+
 from birdclef.config import LoaderConfig, LRSchedulerConfig, RuntimeConfig  # noqa: E402
 from birdclef.data.audio import read_audio_window  # noqa: E402
 from birdclef.data.prepared import audio_training_datasets, load_audio_split  # noqa: E402
@@ -18,6 +20,14 @@ from birdclef.models.audio_cnn.config import AudioExperimentConfig, AudioModelCo
 from birdclef.models.audio_cnn.model import AudioCNN  # noqa: E402
 from birdclef.models.audio_cnn.network import AudioCNNModule  # noqa: E402
 from birdclef.processing.audio import log_mel  # noqa: E402
+
+
+def first_conv(features: nn.Sequential) -> nn.Conv2d:
+    stem = features[0]
+    assert isinstance(stem, nn.Sequential)
+    convolution = stem[0]
+    assert isinstance(convolution, nn.Conv2d)
+    return convolution
 
 
 @pytest.fixture(autouse=True)
@@ -39,7 +49,7 @@ def test_network_shapes_and_gradients_reach_encoder_and_head():
     loss = module.loss((inputs, targets))
     loss.backward()
     assert torch.isfinite(loss)
-    for parameter in [module.encoder[0][0].weight, module.head[1].weight]:
+    for parameter in [first_conv(module.encoder).weight, module.head[1].weight]:
         assert parameter.grad is not None
         assert torch.isfinite(parameter.grad).all()
         assert torch.count_nonzero(parameter.grad) > 0
@@ -56,15 +66,15 @@ def test_pretrained_stem_averages_rgb_and_offline_initialization_skips_weights(m
         backbone = original_factory(weights=None)
         with torch.no_grad():
             for channel, value in enumerate([1.0, 2.0, 3.0]):
-                backbone.features[0][0].weight[:, channel].fill_(value)
+                first_conv(backbone.features).weight[:, channel].fill_(value)
         return backbone
 
     monkeypatch.setattr(network, "efficientnet_b0", fake_factory)
     config = AudioModelConfig(target_columns=["a"], pretrained=True)
     module = AudioCNNModule(config, LRSchedulerConfig())
     assert seen[-1] == network.EfficientNet_B0_Weights.IMAGENET1K_V1
-    assert module.encoder[0][0].weight.shape[1] == 1
-    assert module.encoder[0][0].weight.eq(2).all()
+    assert first_conv(module.encoder).weight.shape[1] == 1
+    assert first_conv(module.encoder).weight.eq(2).all()
     AudioCNNModule(config, LRSchedulerConfig(), initialize_pretrained=False)
     assert seen[-1] is None
 
