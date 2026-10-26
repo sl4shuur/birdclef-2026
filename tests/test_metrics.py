@@ -51,3 +51,15 @@ def test_score_rejects_invalid_predictions(solution, invalid):
 def test_score_rejects_missing_species(solution):
     with pytest.raises(ValueError, match="species columns"):
         score(solution, solution.drop(columns="absent"))
+
+
+def test_evaluation_report_keeps_unobserved_species(solution):
+    from birdclef.eval.metrics import evaluate
+
+    predictions = solution.assign(bird=[0.1, 0.9, 0.2, 0.8], absent=0.1)
+    auc, report = evaluate(solution, predictions)
+    assert auc == 1
+    assert report.loc["bird", "auc"] == 1
+    assert report.loc["bird", "positive"] == 2
+    assert report.loc["bird", "negative"] == 2
+    assert pd.isna(report.loc["absent", "auc"])
