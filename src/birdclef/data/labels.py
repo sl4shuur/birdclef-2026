@@ -43,3 +43,24 @@ def encode_labels(
                 raise ValueError(f"Unknown species label: {label!r}")
             targets[row, positions[label]] = 1
     return pd.DataFrame(targets, columns=classes, index=frame.index)
+
+
+def align_targets(metadata: pd.DataFrame, targets: pd.DataFrame, *, key: str) -> pd.DataFrame:
+    """Match keyed targets to metadata explicitly, including after CSV reload.
+
+    Read saved targets with index_col=key. A RangeIndex cannot prove identity.
+    Extra/missing keys, duplicates and null identifiers fail rather than guessing.
+    """
+    keys = metadata[key]
+    if (
+        targets.index.name != key
+        or not targets.index.is_unique
+        or targets.index.hasnans
+        or keys.isna().any()
+        or keys.duplicated().any()
+        or set(keys) != set(targets.index)
+    ):
+        raise ValueError(f"Metadata and targets need the same unique, nonnull {key} keys.")
+    result = targets.loc[keys].copy()
+    result.index = metadata.index
+    return result

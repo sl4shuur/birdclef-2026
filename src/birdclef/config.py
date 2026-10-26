@@ -86,6 +86,8 @@ class LoaderConfig(ConfigModel):
     num_workers: int = Field(default=0, ge=0)
     pin_memory: bool = False
     seed: int = Field(default=0, ge=0)
+    # For SourceWeightedRandomSampler with focal and soundscape datasets.
+    soundscape_probability: float = Field(default=0.1, ge=0, le=1, allow_inf_nan=False)
 
 
 class LRSchedulerConfig(ConfigModel):
