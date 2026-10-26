@@ -4,6 +4,7 @@ from hashlib import sha256
 
 import numpy as np
 import pandas as pd
+from sklearn.model_selection import GroupKFold
 
 from birdclef.competition import ROW_ID
 from birdclef.core.schemas import DataSplit, SplitManifest
@@ -56,3 +57,24 @@ def group_holdout(
             row_keys_checksum=checksum,
         ),
     )
+
+
+def group_folds(
+    frame: pd.DataFrame, *, n_splits: int = 5, group_column: str = "filename"
+) -> pd.Series:
+    """Zero-based GroupKFold assignments, stable under input row permutations.
+
+    No label stratification or coverage guarantee. Save assignments by row_id;
+    never recompute splits after filtering windows for a training experiment.
+    """
+    groups = frame[group_column]
+    if not groups.map(lambda value: isinstance(value, str) and bool(value.strip())).all():
+        raise ValueError("Split group keys must be nonempty strings.")
+    if n_splits < 2 or groups.nunique() < n_splits:
+        raise ValueError("Need at least n_splits distinct groups and n_splits >= 2.")
+    order = np.argsort(groups.to_numpy(), kind="stable")
+    assignments = np.full(len(frame), -1, dtype=np.int64)
+    splitter = GroupKFold(n_splits=n_splits)
+    for fold, (_, valid) in enumerate(splitter.split(order, groups=groups.iloc[order])):
+        assignments[order[valid]] = fold
+    return pd.Series(assignments, index=frame.index, name="fold")
