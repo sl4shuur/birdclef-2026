@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 
 from birdclef.competition import ROW_ID, SEGMENT_SECONDS, SOUNDSCAPE_SECONDS
-from birdclef.data.labels import encode_labels
+from birdclef.data.labels import align_targets, encode_labels
 
 
 def _audio_paths(directory: Path, filenames: pd.Series) -> list[str]:
@@ -33,6 +33,7 @@ def focal_manifest(
     metadata = frame.reset_index(drop=True).copy()
     metadata["path"] = _audio_paths(directory, metadata.filename)
     targets = encode_labels(metadata, classes, include_secondary=include_secondary)
+    targets.index = pd.Index(metadata.filename, name="filename")
     return metadata, targets
 
 
@@ -89,4 +90,38 @@ def soundscape_manifest(
         }
     )
     targets = encode_labels(label_frame, classes)
+    targets.index = pd.Index(metadata[ROW_ID], name=ROW_ID)
     return metadata.drop(columns=["primary_label", "labels"]), targets
+
+
+def filter_focal_duration(
+    metadata: pd.DataFrame,
+    targets: pd.DataFrame,
+    headers: pd.DataFrame,
+    *,
+    min_duration: float = 1.0,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Exclude clips below the threshold, keeping an explicit review table.
+
+    Headers must cover every focal filename once. Source audio stays untouched.
+    """
+    if not np.isfinite(min_duration) or min_duration < 0:
+        raise ValueError("min_duration must be finite and nonnegative.")
+    align_targets(metadata, targets, key="filename")
+    durations = headers.set_index("filename").duration
+    if (
+        not durations.index.is_unique
+        or durations.index.hasnans
+        or set(durations.index) != set(metadata.filename)
+    ):
+        raise ValueError("Headers must cover the same unique focal filenames.")
+    durations = durations.reindex(metadata.filename).to_numpy(dtype=float)
+    if not np.isfinite(durations).all() or (durations <= 0).any():
+        raise ValueError("Audio durations must be finite and positive.")
+    keep = durations >= min_duration
+    excluded = metadata.loc[~keep].copy()
+    excluded["duration"] = durations[~keep]
+    retained = metadata.loc[keep].copy()
+    if retained.empty:
+        raise ValueError("Duration filtering removed every focal recording.")
+    return retained, targets.loc[retained.filename].copy(), excluded

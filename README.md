@@ -138,3 +138,17 @@ The competition has concluded; leaderboard submissions depend on Kaggle's post-c
 ## Audio data preparation
 
 `FocalAudioDataset` returns random 5-second training crops or centered evaluation crops with weak clip-level targets. `SoundscapeDataset` reads exact annotated windows, never adding unannotated negatives. Both return mono 32 kHz waveforms and binary targets in the supplied class order; an optional `log_mel` transform returns `(1, 128, 497)` tensors. See `src/birdclef/data/README.md` for contracts.
+
+Run `notebooks/local/data_prep.ipynb` using the local starter environment. Paths
+come from the config: `data.competition_dir` (default `data/competition`) and
+`data.output_dir` (artifacts in `outputs/data_prep`). Focal clips shorter than one
+second are excluded with a report; original audio files remain untouched. Target
+CSVs include identity keys (`filename` / `row_id`) and align by key after reload.
+
+The notebook visualizes the audio-to-tensor stages and source sampling.
+`loader.soundscape_probability` is a training hyperparameter: 0.3 means an expected
+30% soundscape windows under `SourceWeightedRandomSampler`, independently of
+source sizes. Call `sampler.set_soundscape_probability(0.3)` between epochs to
+change the mixture with the same loader and model. An active iterator and its
+prefetched batches are unchanged. Pass the sampler to `TrainingDataModule`;
+validation is never oversampled. This is source balancing, not species balancing.

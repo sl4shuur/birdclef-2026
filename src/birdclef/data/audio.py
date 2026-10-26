@@ -13,6 +13,7 @@ from torch.utils.data import Dataset
 
 from birdclef.competition import SAMPLE_RATE, SEGMENT_SECONDS, SOUNDSCAPE_SECONDS
 from birdclef.data.features import feature_tensor
+from birdclef.data.labels import align_targets
 
 Transform = Callable[[torch.Tensor], torch.Tensor]
 
@@ -56,9 +57,8 @@ def read_audio_window(
     return torch.from_numpy(values.astype(np.float32, copy=False))
 
 
-def _targets(metadata: pd.DataFrame, targets: pd.DataFrame) -> torch.Tensor:
-    if not metadata.index.equals(targets.index):
-        raise ValueError("Metadata and target indices must match in order.")
+def _targets(metadata: pd.DataFrame, targets: pd.DataFrame, *, key: str) -> torch.Tensor:
+    targets = align_targets(metadata, targets, key=key)
     if not targets.columns.is_unique or targets.shape[1] == 0:
         raise ValueError("Target species columns must be unique and nonempty.")
     values = feature_tensor(targets, targets.columns.tolist())
@@ -83,7 +83,7 @@ class FocalAudioDataset(Dataset[tuple[torch.Tensor, torch.Tensor]]):
         transform: Transform | None = None,
     ) -> None:
         self.paths = metadata.path.tolist()
-        self.targets = _targets(metadata, targets)
+        self.targets = _targets(metadata, targets, key="filename")
         self.training = training
         self.transform = transform
 
@@ -91,6 +91,7 @@ class FocalAudioDataset(Dataset[tuple[torch.Tensor, torch.Tensor]]):
         return len(self.paths)
 
     def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
+        # TODO: accelerate for GPU training (reuse headers and profile CPU preprocessing).
         info = sf.info(self.paths[index])
         available = max(0, info.frames - SEGMENT_SECONDS * info.samplerate)
         offset = int(torch.randint(available + 1, ()).item()) if self.training else available // 2
@@ -113,7 +114,7 @@ class SoundscapeDataset(Dataset[tuple[torch.Tensor, torch.Tensor]]):
         ).all():
             raise ValueError("Expected aligned 5-second soundscape windows.")
         self.windows = list(zip(metadata.path, metadata.start, strict=True))
-        self.targets = _targets(metadata, targets)
+        self.targets = _targets(metadata, targets, key="row_id")
         self.transform = transform
 
     def __len__(self) -> int:
