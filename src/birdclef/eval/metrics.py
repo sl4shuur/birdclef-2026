@@ -1,6 +1,5 @@
 """Local adaptation of https://www.kaggle.com/code/metric/birdclef-roc-auc."""
 
-import numpy as np
 import pandas as pd
 from pandas.api.types import is_numeric_dtype
 from sklearn.metrics import roc_auc_score
@@ -66,9 +65,8 @@ def evaluate(solution: pd.DataFrame, submission: pd.DataFrame) -> tuple[float, p
     positive = targets.sum()
     report = pd.DataFrame({"positive": positive, "negative": len(targets) - positive})
     report.index.name = "species"
-    report["auc"] = np.nan
+    report["auc"] = float("nan")
     active = positive.index[positive.gt(0)].tolist()
-    report.loc[active, "auc"] = np.atleast_1d(
-        roc_auc_score(targets[active], submission[active], average=None)
-    )
+    for label in active:
+        report.loc[label, "auc"] = roc_auc_score(targets[label], submission[label])
     return macro, report

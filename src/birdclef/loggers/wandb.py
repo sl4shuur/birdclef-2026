@@ -35,7 +35,7 @@ def wandb_run(
     Online runs can resume logging; offline launches create local sessions for later sync.
     """
     save_dir.mkdir(parents=True, exist_ok=True)
-    if run_id is None and rank_zero_only.rank == 0:
+    if run_id is None and getattr(rank_zero_only, "rank", 0) == 0:
         path = save_dir / "wandb-run-id.txt"
         if path.exists():
             run_id = path.read_text(encoding="utf-8").strip()
@@ -49,7 +49,7 @@ def wandb_run(
     if wandb.run is not None:
         # A cell interrupted earlier can leave its run open, and one id cannot be opened twice.
         wandb.run.finish()
-    if rank_zero_only.rank == 0 and config.api_key is not None and not config.offline:
+    if getattr(rank_zero_only, "rank", 0) == 0 and config.api_key is not None and not config.offline:
         wandb.login(key=config.api_key.get_secret_value())
     exit_code = 0
     try:

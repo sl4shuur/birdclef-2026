@@ -9,18 +9,25 @@ import pandas as pd
 import torch
 
 from birdclef.competition import ROW_ID
-from birdclef.data.audio import InferenceSoundscapeDataset
-from birdclef.data.datamodule import TrainingDataModule, prediction_dataloader
-from birdclef.data.prepared import audio_training_datasets
-from birdclef.data.sampling import SourceWeightedRandomSampler
-from birdclef.eval.metrics import evaluate
-from birdclef.experiment.contract import BirdClefModel, RunContext
-from birdclef.models.audio_cnn.config import AudioExperimentConfig
-from birdclef.models.audio_cnn.network import AudioCNNModule
-from birdclef.models.checkpoints import read_fit_state
-from birdclef.models.trainer import check_fit_inputs, fit_module, predict_module
-from birdclef.processing.audio import log_mel
-from birdclef.submission.format import validate_row_ids
+from birdclef.data import (
+    InferenceSoundscapeDataset,
+    SourceWeightedRandomSampler,
+    TrainingDataModule,
+    audio_training_datasets,
+    prediction_dataloader,
+)
+from birdclef.eval import evaluate
+from birdclef.experiment import BirdClefModel, RunContext
+from birdclef.models import (
+    AudioCNNModule,
+    AudioExperimentConfig,
+    check_fit_inputs,
+    fit_module,
+    predict_module,
+    read_fit_state,
+)
+from birdclef.processing import log_mel
+from birdclef.submission import validate_row_ids
 
 
 class AudioCNN(BirdClefModel):

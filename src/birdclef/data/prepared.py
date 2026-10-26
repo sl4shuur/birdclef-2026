@@ -9,7 +9,7 @@ from torch.utils.data import ConcatDataset
 
 from birdclef.data.audio import FocalAudioDataset, SoundscapeDataset
 from birdclef.data.labels import align_targets
-from birdclef.processing.audio import log_mel
+from birdclef.processing import log_mel
 
 
 def load_audio_split(

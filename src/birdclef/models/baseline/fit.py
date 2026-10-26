@@ -11,7 +11,7 @@ from pathlib import Path
 import rich_click as click
 
 from birdclef.cli_common import CONTEXT_SETTINGS, fit_options, load_config
-from birdclef.models.baseline.config import BaselineExperimentConfig
+from birdclef.models import BaselineExperimentConfig
 
 
 @click.command(context_settings=CONTEXT_SETTINGS)
@@ -29,12 +29,14 @@ def fit(config_path: Path, name: str, dataset_id: str, train_path: Path, valid_p
     import pandas as pd
     from lightning.pytorch.utilities import rank_zero_only
 
-    from birdclef.experiment.contract import RunContext
+    from birdclef.experiment import RunContext
     from birdclef.loggers import CustomLogger, apply_logging_config, wandb_run
-    from birdclef.models.baseline.model import Baseline
+    from birdclef.models import Baseline
 
     apply_logging_config(config.logging)
-    logger = CustomLogger(f"baseline.rank{rank_zero_only.rank}", config=config.logging)
+    logger = CustomLogger(
+        f"baseline.rank{getattr(rank_zero_only, 'rank', 0)}", config=config.logging
+    )
     output_dir = config.data.output_dir / name
     try:
         train, valid = pd.read_csv(train_path), pd.read_csv(valid_path)
@@ -43,7 +45,7 @@ def fit(config_path: Path, name: str, dataset_id: str, train_path: Path, valid_p
             Baseline(config).fit(train, valid, context)
     except (OSError, ValueError, KeyError) as error:
         raise click.ClickException(str(error)) from error
-    if rank_zero_only.rank == 0:
+    if getattr(rank_zero_only, "rank", 0) == 0:
         click.echo(f"Saved training run: {output_dir}")
 
 

@@ -4,12 +4,11 @@ import torch
 from torch import nn
 
 from birdclef.config import LRSchedulerConfig
-from birdclef.models.baseline.config import ModelConfig
-from birdclef.models.common import BirdClefModule, TrainingBatch
+from birdclef.models import BaselineModelConfig, BirdClefModule, TrainingBatch
 
 
 class BaselineModule(BirdClefModule):
-    def __init__(self, config: ModelConfig, lr_scheduler: LRSchedulerConfig) -> None:
+    def __init__(self, config: BaselineModelConfig, lr_scheduler: LRSchedulerConfig) -> None:
         super().__init__(
             learning_rate=config.learning_rate,
             weight_decay=config.weight_decay,
