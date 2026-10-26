@@ -1,13 +1,10 @@
 """Feature-based MLP lifecycle; tensor preparation belongs to birdclef.data."""
 
-import hashlib
-import json
 from pathlib import Path
 from typing import Self
 
 import lightning as L
 import pandas as pd
-from lightning.pytorch.utilities import rank_zero_only
 
 from birdclef.competition import ROW_ID
 from birdclef.data.datamodule import TrainingDataModule, prediction_dataloader
@@ -16,7 +13,7 @@ from birdclef.experiment.contract import BirdClefModel, RunContext
 from birdclef.models.baseline.config import BaselineExperimentConfig
 from birdclef.models.baseline.network import BaselineModule
 from birdclef.models.checkpoints import read_fit_state
-from birdclef.models.trainer import fit_module, predict_module
+from birdclef.models.trainer import check_fit_inputs, fit_module, predict_module
 from birdclef.submission.format import validate_row_ids
 
 
@@ -93,33 +90,5 @@ class Baseline(BirdClefModel):
         return result
 
     def _check_inputs(self, train: pd.DataFrame, valid: pd.DataFrame, context: RunContext) -> None:
-        """Refuse changed data/settings; only epoch budget and checkpoint count may change."""
-        output_dir = context.output_dir
-        settings = self.config.safe_dump()
-        keys = ("model", "loader", "lr_scheduler", "train")
-        settings = {key: settings[key] for key in keys}
-        for key in ("max_epochs", "checkpoint_top_k"):
-            settings["train"].pop(key)
         columns = [*self.config.model.feature_columns, *self.config.model.target_columns]
-        checksums = [
-            hashlib.sha256(
-                pd.util.hash_pandas_object(df[columns], index=True).values.tobytes()
-            ).hexdigest()
-            for df in (train, valid)
-        ]
-        signature = {"settings": settings, "data": checksums, "protocol": context.protocol}
-        path = output_dir / "fit-inputs.json"
-        if path.exists():
-            if json.loads(path.read_text(encoding="utf-8")) != signature:
-                raise ValueError("Data or model settings changed; choose a new run directory.")
-        elif (output_dir / "checkpoints").exists() or (output_dir / "fit.json").exists():
-            raise ValueError("Existing checkpoints require fit-inputs.json to resume safely.")
-        if rank_zero_only.rank == 0:
-            output_dir.mkdir(parents=True, exist_ok=True)
-            temporary = path.with_suffix(".json.tmp")
-            temporary.write_text(json.dumps(signature, indent=2), encoding="utf-8")
-            temporary.replace(path)
-            (output_dir / "model-config.json").write_text(
-                json.dumps(self.config.safe_dump(), indent=2),
-                encoding="utf-8",
-            )
+        check_fit_inputs(self.config, train, valid, columns, context)

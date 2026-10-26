@@ -1,15 +1,19 @@
 """Lightning training/resume and single-device inference, shared between models."""
 
+import hashlib
+import json
 import time
 from pathlib import Path
 
 import lightning as L
+import pandas as pd
 import torch
 from lightning.pytorch.strategies import DDPStrategy
+from lightning.pytorch.utilities import rank_zero_only
 from torch.nn.parallel import DistributedDataParallel
 from torch.utils.data import DataLoader
 
-from birdclef.config import LoaderConfig, RuntimeConfig, TrainConfig
+from birdclef.config import Config, LoaderConfig, RuntimeConfig, TrainConfig
 from birdclef.experiment.contract import RunContext
 from birdclef.models.checkpoints import (
     FitState,
@@ -108,3 +112,39 @@ def predict_module(
     if not batches:
         raise ValueError("Prediction requires at least one batch.")
     return torch.cat([batch.detach().cpu() for batch in batches])
+
+
+def check_fit_inputs(
+    config: Config,
+    train: pd.DataFrame,
+    valid: pd.DataFrame,
+    columns: list[str],
+    context: RunContext,
+) -> None:
+    """Shared resume guard: only epoch budget and checkpoint count may change."""
+    output_dir = context.output_dir
+    settings = config.safe_dump()
+    settings = {key: settings[key] for key in ("model", "loader", "lr_scheduler", "train")}
+    for key in ("max_epochs", "checkpoint_top_k"):
+        settings["train"].pop(key)
+    checksums = [
+        hashlib.sha256(
+            pd.util.hash_pandas_object(frame[columns], index=True).values.tobytes()
+        ).hexdigest()
+        for frame in (train, valid)
+    ]
+    signature = {"settings": settings, "data": checksums, "protocol": context.protocol}
+    path = output_dir / "fit-inputs.json"
+    if path.exists():
+        if json.loads(path.read_text(encoding="utf-8")) != signature:
+            raise ValueError("Data or model settings changed; choose a new run directory.")
+    elif (output_dir / "checkpoints").exists() or (output_dir / "fit.json").exists():
+        raise ValueError("Existing checkpoints require fit-inputs.json to resume safely.")
+    if rank_zero_only.rank == 0:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_suffix(".json.tmp")
+        temporary.write_text(json.dumps(signature, indent=2), encoding="utf-8")
+        temporary.replace(path)
+        (output_dir / "model-config.json").write_text(
+            json.dumps(config.safe_dump(), indent=2), encoding="utf-8"
+        )
