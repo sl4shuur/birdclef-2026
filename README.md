@@ -12,11 +12,11 @@ The project supports **local, Kaggle, and Google Colab** workflows, with modular
 
 ### 1. Exploration & Baseline
 
-- [ ] Perform EDA: class distributions, audio characteristics, labels, sites, and data quality.
-- [ ] Explore additional publicly available audio datasets and pretrained models.
+- [x] Perform EDA: class distributions, audio characteristics, labels, sites, and data quality.
+- [x] Explore additional publicly available audio datasets and pretrained models.
 - [ ] Design modular, readable, and scalable training and inference pipelines.
 - [x] Add label encoding, recording-level holdout, competition metric, and submission tools.
-- [ ] Implement audio preprocessing and select a baseline validation protocol.
+- [x] Implement audio preprocessing and select a baseline validation protocol.
 - [ ] Train a baseline model and implement CPU-compatible inference.
 - [ ] Submit the baseline to Kaggle and record the leaderboard score.
 
