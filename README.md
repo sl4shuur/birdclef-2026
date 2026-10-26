@@ -55,7 +55,7 @@ The project supports **local, Kaggle, and Google Colab** workflows, with modular
 2. Install dependencies:
 
    ```bash
-   uv sync --extra notebooks --extra deep-learning
+   uv sync --extra notebooks --extra deep-learning --extra audio
    ```
 
 3. Configure environment variables:
@@ -99,7 +99,7 @@ uv run pytest
 
 Configuration is managed through `src/birdclef/config.py` and `.env`.
 
-`models/baseline/` contains a multilabel MLP for precomputed numeric features: BCE with logits for training, sigmoid probabilities for inference. Audio decoding, features and an acoustic model are future work. The generic experiment lifecycle files still contain explicit stubs; working MLP entry points are `birdclef.models.baseline.fit` and `birdclef.models.baseline.predict`.
+`models/baseline/` contains a multilabel MLP for precomputed numeric features: BCE with logits for training, sigmoid probabilities for inference. Audio datasets and an optional Log-Mel frontend are available; an acoustic model remains future work. The generic experiment lifecycle files still contain explicit stubs; working MLP entry points are `birdclef.models.baseline.fit` and `birdclef.models.baseline.predict`.
 
 ## Kaggle & Colab
 
@@ -134,3 +134,7 @@ Upload `build/birdclef-colab.zip` and follow the setup cells in `notebooks/colab
 - **External data:** Publicly available data and pretrained models are permitted, subject to competition rules
 
 The competition has concluded; leaderboard submissions depend on Kaggle's post-competition availability.
+
+## Audio data preparation
+
+`FocalAudioDataset` returns random 5-second training crops or centered evaluation crops with weak clip-level targets. `SoundscapeDataset` reads exact annotated windows, never adding unannotated negatives. Both return mono 32 kHz waveforms and binary targets in the supplied class order; an optional `log_mel` transform returns `(1, 128, 497)` tensors. See `src/birdclef/data/README.md` for contracts.
