@@ -14,14 +14,14 @@ from torch.nn.parallel import DistributedDataParallel
 from torch.utils.data import DataLoader
 
 from birdclef.config import Config, LoaderConfig, RuntimeConfig, TrainConfig
-from birdclef.experiment.contract import RunContext
-from birdclef.models.checkpoints import (
+from birdclef.experiment import RunContext
+from birdclef.models import (
     FitState,
     read_fit_state,
     save_fit_state,
     training_callbacks,
 )
-from birdclef.runtime.hardware import resolve_runtime
+from birdclef.runtime import resolve_runtime
 
 
 class _CurrentStreamDDPStrategy(DDPStrategy):
@@ -111,7 +111,12 @@ def predict_module(
     batches = trainer.predict(module, loader, ckpt_path=best, weights_only=False)
     if not batches:
         raise ValueError("Prediction requires at least one batch.")
-    return torch.cat([batch.detach().cpu() for batch in batches])
+    tensors: list[torch.Tensor] = []
+    for batch in batches:
+        if not isinstance(batch, torch.Tensor):
+            raise TypeError("Single-loader prediction must return tensor batches.")
+        tensors.append(batch.detach().cpu())
+    return torch.cat(tensors)
 
 
 def check_fit_inputs(
@@ -129,7 +134,7 @@ def check_fit_inputs(
         settings["train"].pop(key)
     checksums = [
         hashlib.sha256(
-            pd.util.hash_pandas_object(frame[columns], index=True).values.tobytes()
+            pd.util.hash_pandas_object(frame[columns], index=True).to_numpy().tobytes()
         ).hexdigest()
         for frame in (train, valid)
     ]
@@ -140,7 +145,7 @@ def check_fit_inputs(
             raise ValueError("Data or model settings changed; choose a new run directory.")
     elif (output_dir / "checkpoints").exists() or (output_dir / "fit.json").exists():
         raise ValueError("Existing checkpoints require fit-inputs.json to resume safely.")
-    if rank_zero_only.rank == 0:
+    if getattr(rank_zero_only, "rank", 0) == 0:
         output_dir.mkdir(parents=True, exist_ok=True)
         temporary = path.with_suffix(".json.tmp")
         temporary.write_text(json.dumps(signature, indent=2), encoding="utf-8")

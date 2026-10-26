@@ -2,9 +2,9 @@
 
 from functools import lru_cache
 from pathlib import Path
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, ClassVar, Literal
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, SecretStr
+from pydantic import AfterValidator, BaseModel, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from rich.console import Console
 from rich.table import Table
@@ -26,7 +26,7 @@ class ConfigModel(BaseModel):
     """Configuration values share one console presentation."""
 
     # A setting that was renamed or moved must fail loudly instead of being ignored.
-    model_config = ConfigDict(extra="forbid")
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(extra="forbid")
 
     def show(self) -> None:
         table = Table(title=type(self).__name__, header_style="bold cyan", border_style="dim")
@@ -91,7 +91,7 @@ class LoaderConfig(ConfigModel):
 
 
 class LRSchedulerConfig(ConfigModel):
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(extra="forbid", frozen=True)
 
     name: Literal["none", "plateau", "cosine"] = "none"
     # Both schedulers advance once per epoch; cosine's horizon stays fixed on resume.
@@ -114,6 +114,13 @@ class TrainConfig(ConfigModel):
     gradient_clip_val: float = Field(default=1.0, ge=0, allow_inf_nan=False)
     log_every_n_steps: int = Field(default=10, ge=1)
 
+    def run_label(self, *, batch_size: int, learning_rate: float) -> str:
+        """Readable training settings; epoch budget is excluded for continuation."""
+        label = f"bs{batch_size}-lr{learning_rate:g}-s{self.seed}"
+        if self.accumulate_grad_batches > 1:
+            label += f"-acc{self.accumulate_grad_batches}"
+        return label
+
 
 class RuntimeConfig(ConfigModel):
     accelerator: Literal["auto", "cpu", "gpu"] = "auto"
@@ -122,7 +129,7 @@ class RuntimeConfig(ConfigModel):
 
 
 class Config(BaseSettings, ConfigModel):
-    model_config = SettingsConfigDict(
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(
         env_file=PROJECT_ROOT / ".env",
         env_file_encoding="utf-8",
         env_prefix="BCLEF_",

@@ -37,6 +37,9 @@ class AudioCNN(BirdClefModel):
         self._best: Path | None = None
         self.sampler: SourceWeightedRandomSampler | None = None
 
+    def run_name(self, name: str = "audio-cnn") -> str:
+        return self.config.run_name(name)
+
     @classmethod
     def from_run(cls, output_dir: Path, *, config: AudioExperimentConfig | None = None) -> Self:
         saved = AudioExperimentConfig.model_validate_json(
@@ -65,9 +68,10 @@ class AudioCNN(BirdClefModel):
         evaluate(valid[[ROW_ID, *classes]], valid[[ROW_ID, *classes]])
         columns = ["source", "filename", "path", "start", "end", ROW_ID, *classes]
         check_fit_inputs(config, train, valid, columns, context)
+        focal_count = training.cumulative_sizes[0]
         self.sampler = SourceWeightedRandomSampler(
-            len(training.datasets[0]),
-            len(training.datasets[1]),
+            focal_count,
+            len(training) - focal_count,
             soundscape_probability=config.loader.soundscape_probability,
             generator=torch.Generator().manual_seed(config.loader.seed),
         )

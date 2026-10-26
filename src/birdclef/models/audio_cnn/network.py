@@ -8,9 +8,8 @@ from torchvision.models import EfficientNet_B0_Weights, efficientnet_b0
 
 from birdclef.competition import ROW_ID
 from birdclef.config import LRSchedulerConfig
-from birdclef.eval.metrics import evaluate
-from birdclef.models.audio_cnn.config import AudioModelConfig
-from birdclef.models.common import BirdClefModule, TrainingBatch
+from birdclef.eval import evaluate
+from birdclef.models import AudioModelConfig, BirdClefModule, TrainingBatch
 
 
 class AudioCNNModule(BirdClefModule):
@@ -32,18 +31,25 @@ class AudioCNNModule(BirdClefModule):
             else None
         )
         backbone = efficientnet_b0(weights=weights)
-        original = backbone.features[0][0]
+        stem = backbone.features[0]
+        if not isinstance(stem, nn.Sequential):
+            raise TypeError("Expected a sequential EfficientNet stem.")
+        original = stem[0]
+        if not isinstance(original, nn.Conv2d):
+            raise TypeError("Expected an EfficientNet convolutional stem.")
         mono = nn.Conv2d(
             1,
             original.out_channels,
-            kernel_size=original.kernel_size,
-            stride=original.stride,
-            padding=original.padding,
+            kernel_size=(original.kernel_size[0], original.kernel_size[1]),
+            stride=(original.stride[0], original.stride[1]),
+            padding=original.padding
+            if isinstance(original.padding, str)
+            else (original.padding[0], original.padding[1]),
             bias=False,
         )
         with torch.no_grad():
             mono.weight.copy_(original.weight.mean(dim=1, keepdim=True))
-        backbone.features[0][0] = mono
+        stem[0] = mono
         self.encoder = backbone.features
         self.pool = nn.AdaptiveAvgPool2d(1)
         self.head = nn.Sequential(

@@ -22,6 +22,36 @@ class AudioModelConfig(ConfigModel):
             raise ValueError("Species must be unique, nonempty and exclude row_id.")
         return values
 
+    def run_label(self) -> str:
+        initialization = "imagenet" if self.pretrained else "scratch"
+        return f"effb0-{initialization}-drop{self.dropout:g}"
+
 
 class AudioExperimentConfig(Config):
     model: AudioModelConfig
+    fold: int = Field(default=0, ge=0)
+    smoke: bool = False
+
+    def run_name(self, name: str = "audio-cnn") -> str:
+        """Compose model, split and training labels; the fit signature guards identity."""
+        if (
+            not name.strip()
+            or name in {".", ".."}
+            or any(character in name for character in '<>:"/\\|?*')
+            or name.endswith((" ", "."))
+        ):
+            raise ValueError("Run name must be a nonempty folder name without path separators.")
+        training = self.train.run_label(
+            batch_size=self.loader.batch_size, learning_rate=self.model.learning_rate
+        )
+        parts = [
+            name,
+            f"fold{self.fold}",
+            self.model.run_label(),
+            training,
+            f"wd{self.model.weight_decay:g}-sc{self.loader.soundscape_probability:g}",
+            self.lr_scheduler.name,
+        ]
+        if self.smoke:
+            parts.append("smoke")
+        return "__".join(parts)
