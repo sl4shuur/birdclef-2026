@@ -100,20 +100,24 @@ class FocalAudioDataset(Dataset[tuple[torch.Tensor, torch.Tensor]]):
         return inputs, self.targets[index]
 
 
+def _soundscape_windows(metadata: pd.DataFrame) -> list[tuple[str, float]]:
+    if not (
+        (metadata.start >= 0)
+        & (metadata.end <= SOUNDSCAPE_SECONDS)
+        & (metadata.start % SEGMENT_SECONDS == 0)
+        & (metadata.end - metadata.start == SEGMENT_SECONDS)
+    ).all():
+        raise ValueError("Expected aligned 5-second soundscape windows.")
+    return list(zip(metadata.path, metadata.start, strict=True))
+
+
 class SoundscapeDataset(Dataset[tuple[torch.Tensor, torch.Tensor]]):
     """Exact annotated windows; no random crop, padding or unannotated negatives."""
 
     def __init__(
         self, metadata: pd.DataFrame, targets: pd.DataFrame, *, transform: Transform | None = None
     ) -> None:
-        if not (
-            (metadata.start >= 0)
-            & (metadata.end <= SOUNDSCAPE_SECONDS)
-            & (metadata.start % SEGMENT_SECONDS == 0)
-            & (metadata.end - metadata.start == SEGMENT_SECONDS)
-        ).all():
-            raise ValueError("Expected aligned 5-second soundscape windows.")
-        self.windows = list(zip(metadata.path, metadata.start, strict=True))
+        self.windows = _soundscape_windows(metadata)
         self.targets = _targets(metadata, targets, key="row_id")
         self.transform = transform
 
@@ -125,3 +129,19 @@ class SoundscapeDataset(Dataset[tuple[torch.Tensor, torch.Tensor]]):
         waveform = read_audio_window(path, start=start)
         inputs = self.transform(waveform) if self.transform else waveform
         return inputs, self.targets[index]
+
+
+class InferenceSoundscapeDataset(Dataset[torch.Tensor]):
+    """Exact windows without targets; caller preserves manifest row IDs/order."""
+
+    def __init__(self, metadata: pd.DataFrame, *, transform: Transform | None = None) -> None:
+        self.windows = _soundscape_windows(metadata)
+        self.transform = transform
+
+    def __len__(self) -> int:
+        return len(self.windows)
+
+    def __getitem__(self, index: int) -> torch.Tensor:
+        path, start = self.windows[index]
+        waveform = read_audio_window(path, start=start)
+        return self.transform(waveform) if self.transform else waveform

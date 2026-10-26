@@ -57,3 +57,13 @@ The fraction is expected, not guaranteed per batch. `num_samples` fixes epoch
 length; no species balancing is implied. Pass the sampler explicitly to
 `TrainingDataModule`. Use ordinary sequential loading for validation. Multi-device
 distributed training requires a separate sampling design.
+
+`prepared.load_audio_split` reads/checks the saved version-2 artifacts, rebuilds
+paths from the competition root and selects an existing fold. It never recomputes
+labels or groups. `prepared.audio_training_datasets` rejects shared soundscape
+recordings across train/validation and builds mixed-source training with
+soundscape-only validation.
+
+`audio.InferenceSoundscapeDataset` reads exact window inputs without targets.
+Prediction code owns row IDs and preserves manifest order; window validation
+and audio decoding are shared with the labeled soundscape dataset.
