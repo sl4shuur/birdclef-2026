@@ -1,5 +1,6 @@
 import json
 from hashlib import sha256
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -11,6 +12,7 @@ lightning = pytest.importorskip("lightning")
 sf = pytest.importorskip("soundfile")
 
 from torch import nn  # noqa: E402
+from torch.optim import AdamW  # noqa: E402
 
 from birdclef.config import LoaderConfig, LRSchedulerConfig, RuntimeConfig  # noqa: E402
 from birdclef.data.audio import read_audio_window  # noqa: E402
@@ -55,6 +57,115 @@ def test_network_shapes_and_gradients_reach_encoder_and_head():
         assert torch.count_nonzero(parameter.grad) > 0
     assert isinstance(module.configure_optimizers(), torch.optim.AdamW)
     assert all(parameter.requires_grad for parameter in module.parameters())
+
+
+@pytest.mark.parametrize("last_n", [None, 2])
+def test_frozen_blocks_keep_weights_and_batchnorm_statistics_while_head_trains(last_n):
+    config = AudioModelConfig(
+        pretrained=False,
+        unfreeze_epoch=None if last_n is None else 0,
+        unfreeze_last_n=last_n,
+    )
+    module = AudioCNNModule(config, LRSchedulerConfig(), classes=["a", "b"])
+    module.eval()
+    module.train()  # Lightning switches back to training after validation.
+    boundary = len(module.encoder) - (last_n or 0)
+    before = [
+        {key: value.clone() for key, value in block.state_dict().items()}
+        for block in module.encoder
+    ]
+    head = module.head[1]
+    assert isinstance(head, nn.Linear)
+    head_before = head.weight.detach().clone()
+    optimizer = module.configure_optimizers()
+    assert isinstance(optimizer, AdamW)
+    assert [group["name"] for group in optimizer.param_groups] == ["encoder", "head"]
+    assert [group["lr"] for group in optimizer.param_groups] == [config.encoder_lr, config.head_lr]
+    assert sum(len(group["params"]) for group in optimizer.param_groups) == len(
+        list(module.parameters())
+    )
+    module.loss((torch.randn(2, 1, 128, 497), torch.tensor([[1.0, 0.0], [0.0, 1.0]]))).backward()
+    optimizer.step()
+    for index, block in enumerate(module.encoder):
+        trainable = index >= boundary
+        assert block.training == trainable
+        assert all(parameter.requires_grad == trainable for parameter in block.parameters())
+        after = block.state_dict()
+        if trainable:
+            assert any(not torch.equal(before[index][key], value) for key, value in after.items())
+        else:
+            for key, value in after.items():
+                torch.testing.assert_close(value, before[index][key], rtol=0, atol=0)
+    assert not torch.equal(head.weight, head_before)
+
+
+@pytest.mark.parametrize("scheduler", ["none", "cosine", "plateau"])
+def test_gradual_unfreezing_resumes_at_the_right_epoch_with_optimizer_and_scheduler(
+    tmp_path, scheduler
+):
+    config = AudioModelConfig(pretrained=False, unfreeze_epoch=2)
+    schedule = LRSchedulerConfig(name=scheduler, t_max=4)
+    module = AudioCNNModule(config, schedule, classes=["a", "b"])
+    encoder_before = {key: value.clone() for key, value in module.encoder.state_dict().items()}
+    loader = torch.utils.data.DataLoader(
+        torch.utils.data.TensorDataset(
+            torch.randn(2, 1, 128, 497), torch.tensor([[1.0, 0.0], [0.0, 1.0]])
+        ),
+        batch_size=2,
+    )
+    options: dict[str, Any] = {
+        "accelerator": "cpu",
+        "devices": 1,
+        "logger": False,
+        "enable_checkpointing": False,
+        "enable_progress_bar": False,
+        "enable_model_summary": False,
+        "num_sanity_val_steps": 0,
+        "default_root_dir": tmp_path,
+    }
+    trainer = lightning.Trainer(max_epochs=2, **options)
+    trainer.fit(module, train_dataloaders=loader, val_dataloaders=loader)
+    for key, value in module.encoder.state_dict().items():
+        torch.testing.assert_close(value, encoder_before[key], rtol=0, atol=0)
+    checkpoint = tmp_path / "frozen.ckpt"
+    trainer.save_checkpoint(checkpoint)
+    saved_lrs = [group["lr"] for group in trainer.optimizers[0].param_groups]
+    if scheduler == "cosine":
+        assert saved_lrs == pytest.approx([config.encoder_lr / 2, config.head_lr / 2])
+
+    class CheckResume(lightning.Callback):
+        def on_train_start(self, trainer, pl_module):
+            assert trainer.current_epoch == 2
+            assert [group["lr"] for group in trainer.optimizers[0].param_groups] == saved_lrs
+
+    resumed = AudioCNNModule(config, schedule, classes=["a", "b"])
+    trainer = lightning.Trainer(max_epochs=3, callbacks=[CheckResume()], **options)
+    trainer.fit(
+        resumed,
+        train_dataloaders=loader,
+        val_dataloaders=loader,
+        ckpt_path=checkpoint,
+        weights_only=False,
+    )
+    assert trainer.global_step == 3
+    assert all(parameter.requires_grad for parameter in resumed.encoder.parameters())
+    assert not torch.equal(first_conv(resumed.encoder).weight, encoder_before["0.0.weight"])
+    assert first_conv(resumed.encoder).weight in trainer.optimizers[0].state
+
+
+@pytest.mark.parametrize(
+    "settings",
+    [
+        {"encoder_lr": 0},
+        {"head_lr": float("nan")},
+        {"unfreeze_epoch": -1},
+        {"unfreeze_last_n": 0},
+        {"unfreeze_last_n": 10},
+    ],
+)
+def test_rejects_invalid_fine_tuning_settings(settings):
+    with pytest.raises(ValueError):
+        AudioModelConfig(**settings)
 
 
 def test_pretrained_stem_averages_rgb_and_offline_initialization_skips_weights(monkeypatch):
@@ -122,7 +233,6 @@ def test_validation_is_pooled_and_checkpoint_restores_predictions_without_downlo
     assert trainer.callback_metrics["val/auc_classes"].item() == 2
     trainer.save_checkpoint(tmp_path / "best.ckpt")
     (tmp_path / "classes.json").write_text(json.dumps(["a", "b"]))
-    assert "target_columns" not in config.safe_dump()["model"]
     (tmp_path / "model-config.json").write_text(json.dumps(config.safe_dump()), encoding="utf-8")
     (tmp_path / "fit.json").write_text(
         json.dumps(
@@ -154,13 +264,7 @@ def test_validation_is_pooled_and_checkpoint_restores_predictions_without_downlo
     with pytest.raises(ValueError, match="class order"):
         AudioCNN.from_run(tmp_path).predict(manifest)
     (tmp_path / "classes.json").write_text(json.dumps(["a", "b"]))
-    # Earlier runs stored class names in model-config.json instead of classes.json.
-    legacy = config.safe_dump()
-    legacy["model"]["target_columns"] = ["a", "b"]
-    (tmp_path / "model-config.json").write_text(json.dumps(legacy), encoding="utf-8")
     (tmp_path / "classes.json").unlink()
-    assert AudioCNN.from_run(tmp_path).classes == ["a", "b"]
-    (tmp_path / "model-config.json").write_text(json.dumps(config.safe_dump()), encoding="utf-8")
     with pytest.raises(FileNotFoundError, match="classes.json"):
         AudioCNN.from_run(tmp_path)
 
@@ -213,23 +317,27 @@ def test_prepared_split_checks_identity_and_preserves_recording_groups(tmp_path)
         load_audio_split(tmp_path, tmp_path, fold=0, classes=classes)
 
 
-def test_resume_accepts_matching_legacy_class_metadata_and_rejects_changes(tmp_path):
+def test_resume_checks_ordered_columns_and_training_policy_in_one_signature(tmp_path):
     from unittest.mock import Mock
 
     from birdclef.experiment import RunContext
     from birdclef.models import check_fit_inputs
 
     config = AudioExperimentConfig()
-    frame = pd.DataFrame({"filename": ["a"], "bird": [1]})
+    # Equal target values deliberately make the hashes insensitive to a class swap.
+    frame = pd.DataFrame({"filename": ["a"], "bird": [1], "owl": [1]})
+    columns = ["filename", "bird", "owl"]
     context = RunContext(tmp_path, Mock(), Mock(), "fold-0")
-    check_fit_inputs(config, frame, frame, ["filename", "bird"], context, classes=["bird"])
+    check_fit_inputs(config, frame, frame, columns, context)
     path = tmp_path / "fit-inputs.json"
-    legacy = json.loads(path.read_text(encoding="utf-8"))
-    legacy["settings"]["model"]["target_columns"] = ["bird"]
-    path.write_text(json.dumps(legacy), encoding="utf-8")
-    check_fit_inputs(config, frame, frame, ["filename", "bird"], context, classes=["bird"])
-    assert "target_columns" not in json.loads(path.read_text())["settings"]["model"]
-    legacy["settings"]["model"]["target_columns"] = ["other"]
-    path.write_text(json.dumps(legacy), encoding="utf-8")
-    with pytest.raises(ValueError, match="Class order"):
-        check_fit_inputs(config, frame, frame, ["filename", "bird"], context, classes=["bird"])
+    original = path.read_text(encoding="utf-8")
+    assert json.loads(original)["columns"] == columns
+    config.train.max_epochs += 1
+    config.train.checkpoint_top_k += 1
+    check_fit_inputs(config, frame, frame, columns, context)
+    with pytest.raises(ValueError, match="settings changed"):
+        check_fit_inputs(config, frame, frame, ["filename", "owl", "bird"], context)
+    config.model.unfreeze_epoch = 2
+    with pytest.raises(ValueError, match="settings changed"):
+        check_fit_inputs(config, frame, frame, columns, context)
+    assert path.read_text(encoding="utf-8") == original

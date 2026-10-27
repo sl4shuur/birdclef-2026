@@ -49,57 +49,6 @@ def test_wandb_run_reuses_saved_identity_and_finishes(tmp_path, monkeypatch, fai
     fake_wandb.login.assert_not_called()
 
 
-def test_fit_cli_passes_existing_wandb_wrapper_and_environment_secret(tmp_path, monkeypatch):
-    from birdclef.models.baseline.fit import fit
-    from birdclef.models.baseline.model import Baseline
-
-    tracker = Mock()
-    received = {}
-
-    @contextmanager
-    def wandb_run(config, *, name, save_dir):
-        received.update(config=config, name=name, save_dir=save_dir)
-        yield tracker
-
-    monkeypatch.setattr("birdclef.loggers.wandb_run", wandb_run)
-    monkeypatch.setattr("birdclef.loggers.apply_logging_config", Mock())
-    monkeypatch.setattr("birdclef.loggers.CustomLogger", Mock())
-    train = Mock()
-    monkeypatch.setattr(Baseline, "fit", train)
-    monkeypatch.setenv("BCLEF_TRACKING__API_KEY", "secret-from-environment")
-    config_path = tmp_path / "config.json"
-    config_path.write_text(
-        json.dumps(
-            {
-                "data": {"output_dir": str(tmp_path / "outputs")},
-                "tracking": {"offline": True},
-            }
-        )
-    )
-    data = tmp_path / "data.csv"
-    data.write_text("feature,target\n1,1\n")
-    result = CliRunner().invoke(
-        fit,
-        [
-            "--config",
-            str(config_path),
-            "--name",
-            "example",
-            "--dataset-id",
-            "data-v1",
-            "--train",
-            str(data),
-            "--valid",
-            str(data),
-        ],
-    )
-    assert result.exit_code == 0, result.output
-    assert received["config"].api_key.get_secret_value() == "secret-from-environment"
-    assert received["save_dir"] == tmp_path / "outputs" / "example"
-    assert train.call_args.args[2].tracker is tracker
-    assert "secret-from-environment" not in result.output
-
-
 def test_wandb_prefers_process_secret_and_closes_initialization_failure(tmp_path, monkeypatch):
     module = importlib.import_module("birdclef.loggers.wandb")
     run = Mock()
@@ -179,11 +128,20 @@ def test_audio_fit_cli_uses_wandb_and_saves_secret_free_artifacts(tmp_path, monk
     prepared.mkdir()
     (prepared / "classes.json").write_text(json.dumps(["bird"]))
     result = CliRunner().invoke(
-        fit, ["--config", str(config_path), "--name", "cli", "--prepared-dir", str(prepared)]
+        fit,
+        [
+            "--config",
+            str(config_path),
+            "--name",
+            "audio-cnn/probe",
+            "--prepared-dir",
+            str(prepared),
+        ],
     )
     assert result.exit_code == 0, result.output
-    expected = AudioExperimentConfig.model_validate(payload).run_name("cli")
+    expected = AudioExperimentConfig.model_validate(payload).run_name("audio-cnn/probe")
     assert received["name"] == expected
+    assert received["directory"] == tmp_path / "outputs" / "audio-cnn" / "probe" / "smoke"
     assert received["config"].api_key.get_secret_value() == "environment-secret"
     assert received["train"].source.value_counts().to_dict() == {"focal": 32, "soundscape": 32}
     assert received["valid"] is validation
