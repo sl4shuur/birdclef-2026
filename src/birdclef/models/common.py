@@ -49,7 +49,7 @@ class BirdClefModule(L.LightningModule, ABC):
         self.log(
             "train/loss",
             loss,
-            on_step=False,
+            on_step=True,
             on_epoch=True,
             batch_size=len(batch[0]),
             sync_dist=True,
