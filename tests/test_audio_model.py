@@ -40,7 +40,7 @@ def limited_threads():
 
 def test_network_shapes_and_gradients_reach_encoder_and_head():
     module = AudioCNNModule(
-        AudioModelConfig(target_columns=["a", "b"], pretrained=False), LRSchedulerConfig()
+        AudioModelConfig(pretrained=False), LRSchedulerConfig(), classes=["a", "b"]
     )
     inputs = torch.randn(2, 1, 128, 497)
     targets = torch.tensor([[1.0, 0.0], [0.0, 1.0]])
@@ -70,12 +70,12 @@ def test_pretrained_stem_averages_rgb_and_offline_initialization_skips_weights(m
         return backbone
 
     monkeypatch.setattr(network, "efficientnet_b0", fake_factory)
-    config = AudioModelConfig(target_columns=["a"], pretrained=True)
-    module = AudioCNNModule(config, LRSchedulerConfig())
+    config = AudioModelConfig(pretrained=True)
+    module = AudioCNNModule(config, LRSchedulerConfig(), classes=["a"])
     assert seen[-1] == network.EfficientNet_B0_Weights.IMAGENET1K_V1
     assert first_conv(module.encoder).weight.shape[1] == 1
     assert first_conv(module.encoder).weight.eq(2).all()
-    AudioCNNModule(config, LRSchedulerConfig(), initialize_pretrained=False)
+    AudioCNNModule(config, LRSchedulerConfig(), classes=["a"], initialize_pretrained=False)
     assert seen[-1] is None
 
 
@@ -92,11 +92,13 @@ def test_validation_is_pooled_and_checkpoint_restores_predictions_without_downlo
 
     monkeypatch.setattr(network, "efficientnet_b0", offline_factory)
     config = AudioExperimentConfig(
-        model=AudioModelConfig(target_columns=["a", "b"], pretrained=True),
+        model=AudioModelConfig(pretrained=True),
         runtime=RuntimeConfig(accelerator="cpu", devices=1, precision="32-true"),
         loader=LoaderConfig(predict_batch_size=2),
     )
-    module = AudioCNNModule(config.model, config.lr_scheduler, initialize_pretrained=False)
+    module = AudioCNNModule(
+        config.model, config.lr_scheduler, classes=["a", "b"], initialize_pretrained=False
+    )
     # Each separate batch has no negatives for one species; the full fold is valid.
     inputs = torch.randn(4, 1, 128, 497)
     targets = torch.tensor([[1.0, 0.0], [1.0, 0.0], [0.0, 1.0], [0.0, 1.0]])
@@ -119,6 +121,8 @@ def test_validation_is_pooled_and_checkpoint_restores_predictions_without_downlo
     assert torch.isfinite(trainer.callback_metrics["val/auc"])
     assert trainer.callback_metrics["val/auc_classes"].item() == 2
     trainer.save_checkpoint(tmp_path / "best.ckpt")
+    (tmp_path / "classes.json").write_text(json.dumps(["a", "b"]))
+    assert "target_columns" not in config.safe_dump()["model"]
     (tmp_path / "model-config.json").write_text(json.dumps(config.safe_dump()), encoding="utf-8")
     (tmp_path / "fit.json").write_text(
         json.dumps(
@@ -146,6 +150,19 @@ def test_validation_is_pooled_and_checkpoint_restores_predictions_without_downlo
     assert result.row_id.tolist() == ["clip_5"]
     np.testing.assert_allclose(result[["a", "b"]], expected.numpy(), atol=1e-6)
     assert all(weights is None for weights in seen)
+    (tmp_path / "classes.json").write_text(json.dumps(["b", "a"]))
+    with pytest.raises(ValueError, match="class order"):
+        AudioCNN.from_run(tmp_path).predict(manifest)
+    (tmp_path / "classes.json").write_text(json.dumps(["a", "b"]))
+    # Earlier runs stored class names in model-config.json instead of classes.json.
+    legacy = config.safe_dump()
+    legacy["model"]["target_columns"] = ["a", "b"]
+    (tmp_path / "model-config.json").write_text(json.dumps(legacy), encoding="utf-8")
+    (tmp_path / "classes.json").unlink()
+    assert AudioCNN.from_run(tmp_path).classes == ["a", "b"]
+    (tmp_path / "model-config.json").write_text(json.dumps(config.safe_dump()), encoding="utf-8")
+    with pytest.raises(FileNotFoundError, match="classes.json"):
+        AudioCNN.from_run(tmp_path)
 
 
 def test_prepared_split_checks_identity_and_preserves_recording_groups(tmp_path):
@@ -194,3 +211,25 @@ def test_prepared_split_checks_identity_and_preserves_recording_groups(tmp_path)
     (tmp_path / "classes.json").write_text(json.dumps(classes[::-1]), encoding="utf-8")
     with pytest.raises(ValueError, match="checksum"):
         load_audio_split(tmp_path, tmp_path, fold=0, classes=classes)
+
+
+def test_resume_accepts_matching_legacy_class_metadata_and_rejects_changes(tmp_path):
+    from unittest.mock import Mock
+
+    from birdclef.experiment import RunContext
+    from birdclef.models import check_fit_inputs
+
+    config = AudioExperimentConfig()
+    frame = pd.DataFrame({"filename": ["a"], "bird": [1]})
+    context = RunContext(tmp_path, Mock(), Mock(), "fold-0")
+    check_fit_inputs(config, frame, frame, ["filename", "bird"], context, classes=["bird"])
+    path = tmp_path / "fit-inputs.json"
+    legacy = json.loads(path.read_text(encoding="utf-8"))
+    legacy["settings"]["model"]["target_columns"] = ["bird"]
+    path.write_text(json.dumps(legacy), encoding="utf-8")
+    check_fit_inputs(config, frame, frame, ["filename", "bird"], context, classes=["bird"])
+    assert "target_columns" not in json.loads(path.read_text())["settings"]["model"]
+    legacy["settings"]["model"]["target_columns"] = ["other"]
+    path.write_text(json.dumps(legacy), encoding="utf-8")
+    with pytest.raises(ValueError, match="Class order"):
+        check_fit_inputs(config, frame, frame, ["filename", "bird"], context, classes=["bird"])

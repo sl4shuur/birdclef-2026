@@ -6,7 +6,7 @@ from birdclef.models import AudioExperimentConfig, AudioModelConfig
 
 def test_run_name_composes_model_split_and_training_settings():
     config = AudioExperimentConfig(
-        model=AudioModelConfig(target_columns=["bird"]),
+        model=AudioModelConfig(),
         loader=LoaderConfig(batch_size=4, soundscape_probability=0.1),
         train=TrainConfig(seed=42),
         lr_scheduler=LRSchedulerConfig(name="none"),
@@ -33,6 +33,6 @@ def test_run_name_composes_model_split_and_training_settings():
 
 @pytest.mark.parametrize("name", ["", "../run", r"..\run", "a:b", ".", "run."])
 def test_rejects_invalid_run_name_prefix(name):
-    config = AudioExperimentConfig(model=AudioModelConfig(target_columns=["bird"]))
+    config = AudioExperimentConfig(model=AudioModelConfig())
     with pytest.raises(ValueError, match="Run name"):
         config.run_name(name)
