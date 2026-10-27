@@ -71,7 +71,7 @@ class FitState(BaseModel):
     def best_path(self, output_dir: Path) -> Path:
         if self.best_checkpoint is None:
             raise ValueError("Completed training must identify its best checkpoint.")
-        path = output_dir / self.best_checkpoint.replace("\\", "/")
+        path = output_dir / self.best_checkpoint
         if not path.resolve().is_relative_to(output_dir.resolve()):
             raise ValueError("The best checkpoint must stay inside the run folder.")
         if not path.is_file():

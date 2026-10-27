@@ -1,6 +1,7 @@
 """Shared optimization and loss logging; subclasses own the architecture and task."""
 
 from abc import ABC, abstractmethod
+from typing import Any
 
 import lightning as L
 import torch
@@ -12,9 +13,10 @@ type TrainingBatch = tuple[torch.Tensor, torch.Tensor]
 
 
 class BirdClefModule(L.LightningModule, ABC):
-    """Default batches are (inputs, targets); prediction batches are input tensors.
+    """Multilabel defaults: logits, BCE loss and sigmoid prediction.
 
-    Override the step methods for other batch layouts or task-specific metrics.
+    Default batches are (inputs, targets); prediction batches are input tensors.
+    Override loss/prediction or optimizer groups for model-specific behavior.
     Log additional metrics with self.log; Trainer owns the experiment logger.
     """
 
@@ -29,14 +31,18 @@ class BirdClefModule(L.LightningModule, ABC):
         self._learning_rate = learning_rate
         self._weight_decay = weight_decay
         self._lr_scheduler = lr_scheduler or LRSchedulerConfig()
+        self.criterion = torch.nn.BCEWithLogitsLoss()
 
     @abstractmethod
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+        """Return one logit per class and example."""
+
     def loss(self, batch: TrainingBatch) -> torch.Tensor:
-        """Return the mean batch loss with gradients."""
+        inputs, targets = batch
+        return self.criterion(self(inputs), targets)
 
-    @abstractmethod
     def predict_batch(self, inputs: torch.Tensor) -> torch.Tensor:
-        """Return one prediction per input, preserving batch order."""
+        return self(inputs).sigmoid()
 
     def training_step(self, batch: TrainingBatch, batch_idx: int) -> torch.Tensor:
         loss = self.loss(batch)
@@ -56,9 +62,12 @@ class BirdClefModule(L.LightningModule, ABC):
     def predict_step(self, batch: torch.Tensor, batch_idx: int) -> torch.Tensor:
         return self.predict_batch(batch).detach().cpu()
 
+    def optimizer_groups(self) -> list[dict[str, Any]]:
+        return [{"params": self.parameters()}]
+
     def configure_optimizers(self) -> OptimizerLRScheduler:
         optimizer = torch.optim.AdamW(
-            self.parameters(), lr=self._learning_rate, weight_decay=self._weight_decay
+            self.optimizer_groups(), lr=self._learning_rate, weight_decay=self._weight_decay
         )
         config = self._lr_scheduler
         if config.name == "none":

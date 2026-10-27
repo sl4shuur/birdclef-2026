@@ -131,8 +131,6 @@ def check_fit_inputs(
     valid: pd.DataFrame,
     columns: list[str],
     context: RunContext,
-    *,
-    classes: list[str] | None = None,
 ) -> None:
     """Shared resume guard: only epoch budget and checkpoint count may change."""
     output_dir = context.output_dir
@@ -146,14 +144,15 @@ def check_fit_inputs(
         ).hexdigest()
         for frame in (train, valid)
     ]
-    signature = {"settings": settings, "data": checksums, "protocol": context.protocol}
+    signature = {
+        "settings": settings,
+        "columns": columns,
+        "data": checksums,
+        "protocol": context.protocol,
+    }
     path = output_dir / "fit-inputs.json"
     if path.exists():
         previous = json.loads(path.read_text(encoding="utf-8"))
-        if classes is not None:
-            legacy_classes = previous["settings"]["model"].pop("target_columns", None)
-            if legacy_classes is not None and legacy_classes != classes:
-                raise ValueError("Class order changed; choose a new run directory.")
         if previous != signature:
             raise ValueError("Data or model settings changed; choose a new run directory.")
     elif (output_dir / "checkpoints").exists() or (output_dir / "fit.json").exists():

@@ -114,13 +114,6 @@ class TrainConfig(ConfigModel):
     gradient_clip_val: float = Field(default=1.0, ge=0, allow_inf_nan=False)
     log_every_n_steps: int = Field(default=10, ge=1)
 
-    def run_label(self, *, batch_size: int, learning_rate: float) -> str:
-        """Readable training settings; epoch budget is excluded for continuation."""
-        label = f"bs{batch_size}-lr{learning_rate:g}-s{self.seed}"
-        if self.accumulate_grad_batches > 1:
-            label += f"-acc{self.accumulate_grad_batches}"
-        return label
-
 
 class RuntimeConfig(ConfigModel):
     accelerator: Literal["auto", "cpu", "gpu"] = "auto"
