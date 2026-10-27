@@ -1,5 +1,7 @@
 """EfficientNet-B0 encoder and a separate global-pooling classification head."""
 
+from typing import Any
+
 import numpy as np
 import pandas as pd
 import torch
@@ -8,7 +10,7 @@ from torchvision.models import EfficientNet_B0_Weights, efficientnet_b0
 
 from birdclef.competition import ROW_ID
 from birdclef.config import LRSchedulerConfig
-from birdclef.eval import evaluate
+from birdclef.eval import score
 from birdclef.models import AudioModelConfig, BirdClefModule, TrainingBatch
 
 
@@ -18,6 +20,7 @@ class AudioCNNModule(BirdClefModule):
         config: AudioModelConfig,
         lr_scheduler: LRSchedulerConfig,
         *,
+        classes: list[str],
         initialize_pretrained: bool = True,
     ) -> None:
         super().__init__(
@@ -52,11 +55,15 @@ class AudioCNNModule(BirdClefModule):
         stem[0] = mono
         self.encoder = backbone.features
         self.pool = nn.AdaptiveAvgPool2d(1)
-        self.head = nn.Sequential(
-            nn.Dropout(config.dropout), nn.Linear(1280, len(config.target_columns))
-        )
-        self.classes = config.target_columns.copy()
+        self.head = nn.Sequential(nn.Dropout(config.dropout), nn.Linear(1280, len(classes)))
+        self.classes = classes.copy()
+        self.save_hyperparameters({"classes": self.classes}, logger=False)
         self._validation: list[tuple[torch.Tensor, torch.Tensor]] = []
+
+    def on_load_checkpoint(self, checkpoint: dict[str, Any]) -> None:
+        saved_classes = checkpoint.get("hyper_parameters", {}).get("classes")
+        if saved_classes is not None and saved_classes != self.classes:
+            raise ValueError("Checkpoint class order differs from classes.json.")
 
     def forward(self, inputs: torch.Tensor) -> torch.Tensor:
         if inputs.ndim != 4 or inputs.shape[1:3] != (1, 128):
@@ -96,6 +103,5 @@ class AudioCNNModule(BirdClefModule):
         ids = np.arange(len(targets))
         solution.insert(0, ROW_ID, ids)
         submission.insert(0, ROW_ID, ids)
-        auc, report = evaluate(solution, submission)
-        self.log("val/auc", auc)
-        self.log("val/auc_classes", int(report.auc.notna().sum()))
+        self.log("val/auc", score(solution, submission))
+        self.log("val/auc_classes", int(np.count_nonzero(targets.sum(axis=0))))

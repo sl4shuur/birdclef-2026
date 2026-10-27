@@ -8,7 +8,7 @@ import lightning as L
 import pandas as pd
 import torch
 
-from birdclef.competition import ROW_ID
+from birdclef.competition import ROW_ID, class_columns
 from birdclef.data import (
     InferenceSoundscapeDataset,
     SourceWeightedRandomSampler,
@@ -16,7 +16,7 @@ from birdclef.data import (
     audio_training_datasets,
     prediction_dataloader,
 )
-from birdclef.eval import evaluate
+from birdclef.eval import evaluate, score
 from birdclef.experiment import BirdClefModel, RunContext
 from birdclef.models import (
     AudioCNNModule,
@@ -31,8 +31,9 @@ from birdclef.submission import validate_row_ids
 
 
 class AudioCNN(BirdClefModel):
-    def __init__(self, config: AudioExperimentConfig) -> None:
+    def __init__(self, config: AudioExperimentConfig, *, classes: list[str]) -> None:
         self.config = config
+        self.classes = class_columns(pd.DataFrame(columns=[ROW_ID, *classes]))
         self._module: AudioCNNModule | None = None
         self._best: Path | None = None
         self.sampler: SourceWeightedRandomSampler | None = None
@@ -42,17 +43,27 @@ class AudioCNN(BirdClefModel):
 
     @classmethod
     def from_run(cls, output_dir: Path, *, config: AudioExperimentConfig | None = None) -> Self:
-        saved = AudioExperimentConfig.model_validate_json(
-            (output_dir / "model-config.json").read_text(encoding="utf-8")
+        payload = json.loads((output_dir / "model-config.json").read_text(encoding="utf-8"))
+        legacy_classes = payload["model"].pop("target_columns", None)
+        saved = AudioExperimentConfig.model_validate(payload)
+        classes_path = output_dir / "classes.json"
+        classes = (
+            json.loads(classes_path.read_text(encoding="utf-8"))
+            if classes_path.exists()
+            else legacy_classes
         )
+        if classes is None:
+            raise FileNotFoundError("Inference requires the run's classes.json.")
         if config is not None:
             if config.model != saved.model or config.lr_scheduler != saved.lr_scheduler:
                 raise ValueError("Inference must use the saved model settings.")
             saved.runtime = config.runtime
             saved.loader = config.loader
-        model = cls(saved)
+        model = cls(saved, classes=classes)
         # A trained checkpoint contains every weight. Never download ImageNet at inference.
-        model._module = AudioCNNModule(saved.model, saved.lr_scheduler, initialize_pretrained=False)
+        model._module = AudioCNNModule(
+            saved.model, saved.lr_scheduler, classes=classes, initialize_pretrained=False
+        )
         model._best = read_fit_state(output_dir).best_path(output_dir)
         return model
 
@@ -60,14 +71,25 @@ class AudioCNN(BirdClefModel):
         config = self.config
         if config.runtime.devices != 1:
             raise ValueError("The acoustic baseline currently supports one training device.")
-        classes = config.model.target_columns
+        classes = self.classes
         validate_row_ids(valid)
         L.seed_everything(config.train.seed, workers=True)
         training, validation = audio_training_datasets(train, valid, classes=classes)
         # Check full-fold AUC feasibility before downloading weights or training.
-        evaluate(valid[[ROW_ID, *classes]], valid[[ROW_ID, *classes]])
+        score(valid[[ROW_ID, *classes]], valid[[ROW_ID, *classes]])
         columns = ["source", "filename", "path", "start", "end", ROW_ID, *classes]
-        check_fit_inputs(config, train, valid, columns, context)
+        classes_path = context.output_dir / "classes.json"
+        if classes_path.exists():
+            if json.loads(classes_path.read_text(encoding="utf-8")) != classes:
+                raise ValueError("Class order changed; choose a new run directory.")
+        elif (context.output_dir / "checkpoints").exists():
+            previous = json.loads(
+                (context.output_dir / "model-config.json").read_text(encoding="utf-8")
+            )
+            if previous["model"].get("target_columns") != classes:
+                raise ValueError("Existing checkpoints require matching class metadata.")
+        check_fit_inputs(config, train, valid, columns, context, classes=classes)
+        classes_path.write_text(json.dumps(classes, indent=2), encoding="utf-8")
         focal_count = training.cumulative_sizes[0]
         self.sampler = SourceWeightedRandomSampler(
             focal_count,
@@ -76,10 +98,10 @@ class AudioCNN(BirdClefModel):
             generator=torch.Generator().manual_seed(config.loader.seed),
         )
         data = TrainingDataModule(training, validation, config=config.loader, sampler=self.sampler)
-        context.tracker.log_hyperparams(config.safe_dump())
+        context.tracker.log_hyperparams({**config.safe_dump(), "num_classes": len(classes)})
         continuing = (context.output_dir / "checkpoints" / "last.ckpt").is_file()
         self._module = AudioCNNModule(
-            config.model, config.lr_scheduler, initialize_pretrained=not continuing
+            config.model, config.lr_scheduler, classes=classes, initialize_pretrained=not continuing
         )
         self._best = fit_module(
             self._module,
@@ -108,7 +130,7 @@ class AudioCNN(BirdClefModel):
     def predict(self, frame: pd.DataFrame, context: RunContext | None = None) -> pd.DataFrame:
         if self._module is None or self._best is None:
             raise RuntimeError("Call fit() or from_run() before predict().")
-        classes = self.config.model.target_columns
+        classes = self.classes
         if frame.empty:
             return pd.DataFrame(columns=[ROW_ID, *classes])
         validate_row_ids(frame)
