@@ -8,6 +8,7 @@ from pathlib import Path
 import lightning as L
 import pandas as pd
 import torch
+from lightning.pytorch.callbacks import LearningRateMonitor, TQDMProgressBar
 from lightning.pytorch.strategies import DDPStrategy
 from lightning.pytorch.utilities import rank_zero_only
 from torch.nn.parallel import DistributedDataParallel
@@ -70,7 +71,11 @@ def fit_module(
         gradient_clip_val=train_config.gradient_clip_val,
         log_every_n_steps=train_config.log_every_n_steps,
         logger=run.tracker,
-        callbacks=list(callbacks),
+        callbacks=[
+            *callbacks,
+            LearningRateMonitor(logging_interval="epoch"),
+            TQDMProgressBar(refresh_rate=10),
+        ],
     )
     run.tracker.log_hyperparams(
         {
@@ -107,6 +112,7 @@ def predict_module(
         **resolve_runtime(runtime).model_copy(update={"devices": 1}).model_dump(),
         logger=False,
         enable_checkpointing=False,
+        callbacks=[TQDMProgressBar(refresh_rate=10)],
     )
     batches = trainer.predict(module, loader, ckpt_path=best, weights_only=False)
     if not batches:
@@ -125,6 +131,8 @@ def check_fit_inputs(
     valid: pd.DataFrame,
     columns: list[str],
     context: RunContext,
+    *,
+    classes: list[str] | None = None,
 ) -> None:
     """Shared resume guard: only epoch budget and checkpoint count may change."""
     output_dir = context.output_dir
@@ -141,7 +149,12 @@ def check_fit_inputs(
     signature = {"settings": settings, "data": checksums, "protocol": context.protocol}
     path = output_dir / "fit-inputs.json"
     if path.exists():
-        if json.loads(path.read_text(encoding="utf-8")) != signature:
+        previous = json.loads(path.read_text(encoding="utf-8"))
+        if classes is not None:
+            legacy_classes = previous["settings"]["model"].pop("target_columns", None)
+            if legacy_classes is not None and legacy_classes != classes:
+                raise ValueError("Class order changed; choose a new run directory.")
+        if previous != signature:
             raise ValueError("Data or model settings changed; choose a new run directory.")
     elif (output_dir / "checkpoints").exists() or (output_dir / "fit.json").exists():
         raise ValueError("Existing checkpoints require fit-inputs.json to resume safely.")

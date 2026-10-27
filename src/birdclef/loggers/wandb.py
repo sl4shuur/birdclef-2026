@@ -1,3 +1,4 @@
+import os
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -21,7 +22,8 @@ def _open(config: TrackingConfig, run_id: str | None, name: str, save_dir: Path)
         # Offline runs are synced later with `wandb sync`, which Kaggle notebooks need.
         offline=config.offline,
     )
-    _ = tracker.experiment
+    tracker.experiment.define_metric("val/auc", summary="max")
+    tracker.experiment.define_metric("val/loss", summary="min")
     return tracker
 
 
@@ -49,10 +51,13 @@ def wandb_run(
     if wandb.run is not None:
         # A cell interrupted earlier can leave its run open, and one id cannot be opened twice.
         wandb.run.finish()
-    if getattr(rank_zero_only, "rank", 0) == 0 and config.api_key is not None and not config.offline:
-        wandb.login(key=config.api_key.get_secret_value())
     exit_code = 0
     try:
+        api_key = os.environ.get("WANDB_API_KEY") or (
+            config.api_key.get_secret_value() if config.api_key is not None else None
+        )
+        if getattr(rank_zero_only, "rank", 0) == 0 and api_key and not config.offline:
+            wandb.login(key=api_key)
         tracker = _open(config, run_id, name, save_dir)
         yield tracker
     except BaseException:
