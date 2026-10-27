@@ -4,14 +4,10 @@ from importlib import import_module
 from typing import TYPE_CHECKING
 
 from .audio_cnn.config import AudioExperimentConfig, AudioModelConfig
-from .baseline.config import BaselineExperimentConfig
-from .baseline.config import ModelConfig as BaselineModelConfig
 
 if TYPE_CHECKING:
     from .audio_cnn.model import AudioCNN
     from .audio_cnn.network import AudioCNNModule
-    from .baseline.model import Baseline
-    from .baseline.network import BaselineModule
     from .checkpoints import FitState, read_fit_state, save_fit_state, training_callbacks
     from .common import BirdClefModule, TrainingBatch
     from .trainer import check_fit_inputs, fit_module, predict_module
@@ -19,12 +15,8 @@ if TYPE_CHECKING:
 __all__ = [
     "AudioExperimentConfig",
     "AudioModelConfig",
-    "BaselineExperimentConfig",
-    "BaselineModelConfig",
     "AudioCNN",
     "AudioCNNModule",
-    "Baseline",
-    "BaselineModule",
     "FitState",
     "read_fit_state",
     "save_fit_state",
@@ -39,8 +31,6 @@ __all__ = [
 _MODULES = {
     "AudioCNN": "audio_cnn.model",
     "AudioCNNModule": "audio_cnn.network",
-    "Baseline": "baseline.model",
-    "BaselineModule": "baseline.network",
     "FitState": "checkpoints",
     "read_fit_state": "checkpoints",
     "save_fit_state": "checkpoints",
