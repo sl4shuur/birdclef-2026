@@ -19,7 +19,7 @@ from birdclef.models import AudioExperimentConfig
     required=True,
 )
 @click.option(
-    "--name", default="audio-cnn", show_default=True, help="Prefix for the config-derived run name."
+    "--name", required=True, help="Relative experiment folder, e.g. audio-cnn/linear-probing."
 )
 @click.option(
     "--prepared-dir",
@@ -46,7 +46,7 @@ def fit(config_path: Path, name: str, prepared_dir: Path | None) -> None:
         prepared_dir = prepared_dir or config.data.output_dir / "data_prep"
         classes = json.loads((prepared_dir / "classes.json").read_text(encoding="utf-8"))
         model = AudioCNN(config, classes=classes)
-        run_name = model.run_name(name)
+        run_name = config.run_name(name)
         output_dir = config.data.output_dir / run_name
         train, valid = load_audio_split(
             prepared_dir,

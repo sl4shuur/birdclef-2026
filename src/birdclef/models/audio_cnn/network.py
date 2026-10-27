@@ -1,6 +1,6 @@
 """EfficientNet-B0 encoder and a separate global-pooling classification head."""
 
-from typing import Any
+from typing import Any, Self
 
 import numpy as np
 import pandas as pd
@@ -24,7 +24,7 @@ class AudioCNNModule(BirdClefModule):
         initialize_pretrained: bool = True,
     ) -> None:
         super().__init__(
-            learning_rate=config.learning_rate,
+            learning_rate=config.head_lr,
             weight_decay=config.weight_decay,
             lr_scheduler=lr_scheduler,
         )
@@ -56,13 +56,40 @@ class AudioCNNModule(BirdClefModule):
         self.encoder = backbone.features
         self.pool = nn.AdaptiveAvgPool2d(1)
         self.head = nn.Sequential(nn.Dropout(config.dropout), nn.Linear(1280, len(classes)))
+        self.config = config
         self.classes = classes.copy()
         self.save_hyperparameters({"classes": self.classes}, logger=False)
         self._validation: list[tuple[torch.Tensor, torch.Tensor]] = []
+        self._set_encoder_trainability()
+
+    def _set_encoder_trainability(self) -> None:
+        epoch = self.config.unfreeze_epoch
+        unfrozen = epoch is not None and self.current_epoch >= epoch
+        first = len(self.encoder) - (self.config.unfreeze_last_n or len(self.encoder))
+        self.encoder.train(self.training and unfrozen)
+        for index, block in enumerate(self.encoder):
+            trainable = unfrozen and index >= first
+            block.requires_grad_(trainable)
+            # Frozen blocks keep BatchNorm statistics and stochastic depth fixed.
+            block.train(self.training and trainable)
+
+    def train(self, mode: bool = True) -> Self:
+        super().train(mode)
+        self._set_encoder_trainability()
+        return self
+
+    def on_train_epoch_start(self) -> None:
+        self._set_encoder_trainability()
+
+    def optimizer_groups(self) -> list[dict[str, Any]]:
+        # Include frozen parameters so unfreezing never changes optimizer/scheduler state.
+        return [
+            {"params": self.encoder.parameters(), "lr": self.config.encoder_lr, "name": "encoder"},
+            {"params": self.head.parameters(), "lr": self.config.head_lr, "name": "head"},
+        ]
 
     def on_load_checkpoint(self, checkpoint: dict[str, Any]) -> None:
-        saved_classes = checkpoint.get("hyper_parameters", {}).get("classes")
-        if saved_classes is not None and saved_classes != self.classes:
+        if checkpoint["hyper_parameters"]["classes"] != self.classes:
             raise ValueError("Checkpoint class order differs from classes.json.")
 
     def forward(self, inputs: torch.Tensor) -> torch.Tensor:
@@ -74,20 +101,13 @@ class AudioCNNModule(BirdClefModule):
         features = self.encoder((inputs - mean) / std)
         return self.head(self.pool(features).flatten(1))
 
-    def loss(self, batch: TrainingBatch) -> torch.Tensor:
-        inputs, targets = batch
-        return nn.functional.binary_cross_entropy_with_logits(self(inputs), targets)
-
-    def predict_batch(self, inputs: torch.Tensor) -> torch.Tensor:
-        return self(inputs).sigmoid()
-
     def on_validation_epoch_start(self) -> None:
         self._validation.clear()
 
     def validation_step(self, batch: TrainingBatch, batch_idx: int) -> None:
         inputs, targets = batch
         logits = self(inputs)
-        loss = nn.functional.binary_cross_entropy_with_logits(logits, targets)
+        loss = self.criterion(logits, targets)
         self.log("val/loss", loss, batch_size=len(inputs))
         self._validation.append((targets.detach().cpu(), logits.sigmoid().detach().float().cpu()))
 

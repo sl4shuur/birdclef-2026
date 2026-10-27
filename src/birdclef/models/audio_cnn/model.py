@@ -38,22 +38,12 @@ class AudioCNN(BirdClefModel):
         self._best: Path | None = None
         self.sampler: SourceWeightedRandomSampler | None = None
 
-    def run_name(self, name: str = "audio-cnn") -> str:
-        return self.config.run_name(name)
-
     @classmethod
     def from_run(cls, output_dir: Path, *, config: AudioExperimentConfig | None = None) -> Self:
-        payload = json.loads((output_dir / "model-config.json").read_text(encoding="utf-8"))
-        legacy_classes = payload["model"].pop("target_columns", None)
-        saved = AudioExperimentConfig.model_validate(payload)
-        classes_path = output_dir / "classes.json"
-        classes = (
-            json.loads(classes_path.read_text(encoding="utf-8"))
-            if classes_path.exists()
-            else legacy_classes
+        saved = AudioExperimentConfig.model_validate_json(
+            (output_dir / "model-config.json").read_text(encoding="utf-8")
         )
-        if classes is None:
-            raise FileNotFoundError("Inference requires the run's classes.json.")
+        classes = json.loads((output_dir / "classes.json").read_text(encoding="utf-8"))
         if config is not None:
             if config.model != saved.model or config.lr_scheduler != saved.lr_scheduler:
                 raise ValueError("Inference must use the saved model settings.")
@@ -78,18 +68,10 @@ class AudioCNN(BirdClefModel):
         # Check full-fold AUC feasibility before downloading weights or training.
         score(valid[[ROW_ID, *classes]], valid[[ROW_ID, *classes]])
         columns = ["source", "filename", "path", "start", "end", ROW_ID, *classes]
-        classes_path = context.output_dir / "classes.json"
-        if classes_path.exists():
-            if json.loads(classes_path.read_text(encoding="utf-8")) != classes:
-                raise ValueError("Class order changed; choose a new run directory.")
-        elif (context.output_dir / "checkpoints").exists():
-            previous = json.loads(
-                (context.output_dir / "model-config.json").read_text(encoding="utf-8")
-            )
-            if previous["model"].get("target_columns") != classes:
-                raise ValueError("Existing checkpoints require matching class metadata.")
-        check_fit_inputs(config, train, valid, columns, context, classes=classes)
-        classes_path.write_text(json.dumps(classes, indent=2), encoding="utf-8")
+        check_fit_inputs(config, train, valid, columns, context)
+        (context.output_dir / "classes.json").write_text(
+            json.dumps(classes, indent=2), encoding="utf-8"
+        )
         focal_count = training.cumulative_sizes[0]
         self.sampler = SourceWeightedRandomSampler(
             focal_count,
