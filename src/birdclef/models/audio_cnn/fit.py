@@ -31,9 +31,11 @@ def fit(config_path: Path, name: str, prepared_dir: Path | None) -> None:
     config = load_config(config_path, AudioExperimentConfig)
     if sys.platform == "win32":
         os.environ.setdefault("USE_LIBUV", "0")
+        os.environ.setdefault("MASTER_ADDR", "127.0.0.1")
 
     import pandas as pd
     import wandb
+    from lightning.pytorch.utilities import rank_zero_only
 
     from birdclef.data import load_audio_split
     from birdclef.experiment import RunContext
@@ -68,6 +70,8 @@ def fit(config_path: Path, name: str, prepared_dir: Path | None) -> None:
         )
         with wandb_run(config.tracking, name=run_name, save_dir=output_dir) as tracker:
             model.fit(train, valid, RunContext(output_dir, tracker, logger, protocol))
+            if rank_zero_only.rank != 0:
+                return
             metrics = json.loads(
                 (output_dir / "validation-metrics.json").read_text(encoding="utf-8")
             )

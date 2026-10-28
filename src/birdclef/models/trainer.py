@@ -32,9 +32,20 @@ class _CurrentStreamDDPStrategy(DDPStrategy):
     """
 
     def _setup_model(self, model: torch.nn.Module) -> DistributedDataParallel:
-        return DistributedDataParallel(
-            module=model, device_ids=self.determine_ddp_device_ids(), **self._ddp_kwargs
-        )
+        # Register frozen parameters too: they may be unfrozen after DDP is constructed.
+        parameters = list(model.parameters())
+        trainable = [parameter.requires_grad for parameter in parameters]
+        model.requires_grad_(True)
+        try:
+            return DistributedDataParallel(
+                module=model,
+                device_ids=self.determine_ddp_device_ids(),
+                find_unused_parameters=not all(trainable),
+                **self._ddp_kwargs,
+            )
+        finally:
+            for parameter, enabled in zip(parameters, trainable, strict=True):
+                parameter.requires_grad_(enabled)
 
 
 def fit_module(
@@ -70,6 +81,8 @@ def fit_module(
         accumulate_grad_batches=train_config.accumulate_grad_batches,
         gradient_clip_val=train_config.gradient_clip_val,
         log_every_n_steps=train_config.log_every_n_steps,
+        benchmark=resolved.accelerator != "cpu",
+        num_sanity_val_steps=0,
         logger=run.tracker,
         callbacks=[
             *callbacks,

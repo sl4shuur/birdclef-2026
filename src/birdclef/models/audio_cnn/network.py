@@ -1,11 +1,13 @@
 """EfficientNet-B0 encoder and a separate global-pooling classification head."""
 
+from collections.abc import Sized
 from typing import Any, Self
 
 import numpy as np
 import pandas as pd
 import torch
 from torch import nn
+from torch.utils.data import DataLoader
 from torchvision.models import EfficientNet_B0_Weights, efficientnet_b0
 
 from birdclef.competition import ROW_ID
@@ -54,6 +56,7 @@ class AudioCNNModule(BirdClefModule):
             mono.weight.copy_(original.weight.mean(dim=1, keepdim=True))
         stem[0] = mono
         self.encoder = backbone.features
+        self.encoder.to(memory_format=torch.channels_last)  # type: ignore[call-overload]
         self.pool = nn.AdaptiveAvgPool2d(1)
         self.head = nn.Sequential(nn.Dropout(config.dropout), nn.Linear(1280, len(classes)))
         self.config = config
@@ -98,7 +101,8 @@ class AudioCNNModule(BirdClefModule):
         # Per-example standardization: no statistics fitted to validation data.
         mean = inputs.mean(dim=(-2, -1), keepdim=True)
         std = inputs.std(dim=(-2, -1), keepdim=True, correction=0).clamp_min(1e-6)
-        features = self.encoder((inputs - mean) / std)
+        inputs = ((inputs - mean) / std).contiguous(memory_format=torch.channels_last)
+        features = self.encoder(inputs)
         return self.head(self.pool(features).flatten(1))
 
     def on_validation_epoch_start(self) -> None:
@@ -108,20 +112,31 @@ class AudioCNNModule(BirdClefModule):
         inputs, targets = batch
         logits = self(inputs)
         loss = self.criterion(logits, targets)
-        self.log("val/loss", loss, batch_size=len(inputs))
-        self._validation.append((targets.detach().cpu(), logits.sigmoid().detach().float().cpu()))
+        self.log("val/loss", loss, batch_size=len(inputs), sync_dist=True)
+        self._validation.append((targets.detach(), logits.sigmoid().detach().float()))
 
     def on_validation_epoch_end(self) -> None:
         if self.trainer.sanity_checking:
             self._validation.clear()
             return
-        targets = torch.cat([pair[0] for pair in self._validation]).numpy()
-        probabilities = torch.cat([pair[1] for pair in self._validation]).numpy()
+        values = torch.stack(
+            [torch.cat([pair[index] for pair in self._validation]) for index in (0, 1)], dim=1
+        )
         self._validation.clear()
+        if self.trainer.world_size > 1:
+            loader = self.trainer.val_dataloaders
+            assert isinstance(loader, DataLoader)
+            assert isinstance(loader.dataset, Sized)
+            # DistributedSampler assigns rank::world_size and pads the tail. Restore
+            # the sequential order, then discard padding before computing full-fold AUC.
+            gathered = self.all_gather(values)
+            assert isinstance(gathered, torch.Tensor)
+            values = gathered.transpose(0, 1).flatten(0, 1)[: len(loader.dataset)]
+        targets, probabilities = values.cpu().numpy().transpose(1, 0, 2)
         solution = pd.DataFrame(targets, columns=self.classes)
         submission = pd.DataFrame(probabilities, columns=self.classes)
         ids = np.arange(len(targets))
         solution.insert(0, ROW_ID, ids)
         submission.insert(0, ROW_ID, ids)
-        self.log("val/auc", score(solution, submission))
-        self.log("val/auc_classes", int(np.count_nonzero(targets.sum(axis=0))))
+        self.log("val/auc", score(solution, submission), sync_dist=True)
+        self.log("val/auc_classes", int(np.count_nonzero(targets.sum(axis=0))), sync_dist=True)

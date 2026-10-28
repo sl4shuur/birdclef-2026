@@ -7,6 +7,7 @@ from typing import Self
 import lightning as L
 import pandas as pd
 import torch
+from lightning.pytorch.utilities import rank_zero_only
 
 from birdclef.competition import ROW_ID, class_columns
 from birdclef.data import (
@@ -59,8 +60,6 @@ class AudioCNN(BirdClefModel):
 
     def fit(self, train: pd.DataFrame, valid: pd.DataFrame, context: RunContext) -> None:
         config = self.config
-        if config.runtime.devices != 1:
-            raise ValueError("The acoustic baseline currently supports one training device.")
         classes = self.classes
         validate_row_ids(valid)
         L.seed_everything(config.train.seed, workers=True)
@@ -69,9 +68,10 @@ class AudioCNN(BirdClefModel):
         score(valid[[ROW_ID, *classes]], valid[[ROW_ID, *classes]])
         columns = ["source", "filename", "path", "start", "end", ROW_ID, *classes]
         check_fit_inputs(config, train, valid, columns, context)
-        (context.output_dir / "classes.json").write_text(
-            json.dumps(classes, indent=2), encoding="utf-8"
-        )
+        if rank_zero_only.rank == 0:
+            (context.output_dir / "classes.json").write_text(
+                json.dumps(classes, indent=2), encoding="utf-8"
+            )
         focal_count = training.cumulative_sizes[0]
         self.sampler = SourceWeightedRandomSampler(
             focal_count,
@@ -93,6 +93,8 @@ class AudioCNN(BirdClefModel):
             runtime=config.runtime,
             run=context,
         )
+        if rank_zero_only.rank != 0:
+            return
         predictions = self.predict(valid)
         auc, report = evaluate(valid[[ROW_ID, *classes]], predictions)
         predictions.to_csv(context.output_dir / "validation-predictions.csv", index=False)
