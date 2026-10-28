@@ -55,8 +55,10 @@ with `set_soundscape_probability(p)` between epochs without rebuilding the model
 or loader. Weights affect the next iterator; batches already drawn stay unchanged.
 The fraction is expected, not guaranteed per batch. `num_samples` fixes epoch
 length; no species balancing is implied. Pass the sampler explicitly to
-`TrainingDataModule`. Use ordinary sequential loading for validation. Multi-device
-distributed training requires a separate sampling design.
+`TrainingDataModule`. Lightning's distributed sampler wrapper shards the same
+weighted draw across ranks. `set_epoch` seeds that draw from the saved seed plus
+epoch, including after resume. Validation starts with sequential loading; the
+audio module gathers distributed shards and discards sampler padding for AUC.
 
 `prepared.load_audio_split` reads/checks the saved version-2 artifacts, rebuilds
 paths from the competition root and selects an existing fold. It never recomputes

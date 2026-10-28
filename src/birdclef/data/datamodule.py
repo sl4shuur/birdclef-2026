@@ -29,6 +29,7 @@ class TrainingDataModule(L.LightningDataModule):
             shuffle=self.sampler is None,
             sampler=self.sampler,
             num_workers=self.config.num_workers,
+            persistent_workers=self.config.num_workers > 0,
             pin_memory=self.config.pin_memory,
             generator=torch.Generator().manual_seed(self.config.seed),
         )
@@ -38,6 +39,7 @@ class TrainingDataModule(L.LightningDataModule):
             self.valid,
             batch_size=self.config.val_batch_size,
             num_workers=self.config.num_workers,
+            persistent_workers=self.config.num_workers > 0,
             pin_memory=self.config.pin_memory,
         )
 
@@ -48,5 +50,6 @@ def prediction_dataloader(dataset: Dataset, *, config: LoaderConfig) -> DataLoad
         batch_size=config.predict_batch_size,
         shuffle=False,
         num_workers=config.num_workers,
+        persistent_workers=config.num_workers > 0,
         pin_memory=config.pin_memory,
     )
