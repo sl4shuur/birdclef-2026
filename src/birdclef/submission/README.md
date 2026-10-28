@@ -32,7 +32,9 @@ partial-unfreeze/
   checkpoints/epoch009.ckpt
 ```
 
-`fit.json` selects the best checkpoint; its relative path must be preserved.
+`fit.json` selects the recorded best checkpoint. If an interrupted run has no
+recorded best, inference uses `checkpoints/last.ckpt`. A recorded best whose file
+is missing is reported as an error. Checkpoint paths must stay inside the run.
 The notebook prints all available run paths. One run produces a single-model
 submission. Several runs average probabilities after aligning row IDs and species;
 `WEIGHTS=None` gives equal weights, or provide one positive weight per run.
@@ -60,15 +62,31 @@ always writes real predictions and never falls back to sample rows.
 
 ## Upload local models
 
-Pack only config, classes, fit.json and the best checkpoint, omitting training
-logs, last checkpoints and W&B history:
+Search one or more parent folders recursively and select models with checkboxes:
 
 ```bash
-python -m birdclef.submission.export --run outputs/audio-cnn/partial-unfreeze --run outputs/inference-models/full-finetune --output build/birdclef-models.zip
+uv run python -m birdclef.submission.export --run outputs/audio-cnn --run outputs/inference-models
 ```
 
+`--run` also accepts a single run folder. Overlapping search roots are
+deduplicated. Each item shows its directory and selected checkpoint. Use arrows
+to move, Space to toggle, `a` to toggle all, and Enter to export. Enter with no
+selected models writes nothing; Ctrl+C cancels. Incomplete folders are skipped
+with a reason. Selected run folder names must be unique inside the archive.
+
+Use `--all` to export every discovered model without the interactive prompt:
+
+```bash
+uv run python -m birdclef.submission.export --run outputs/audio-cnn --all --output build/birdclef-models.zip
+```
+
+Only config, classes, the selected checkpoint and an inference `fit.json` are
+packed. Interrupted runs use `last.ckpt`; the archive's `fit.json` points to that
+file. Original run files are never changed. Training logs, other checkpoints and
+W&B history are omitted.
+
 Upload the ZIP as a private Kaggle Dataset, then attach it to the inference
-notebook. Exported run folder names must be unique. Attaching a saved training
+notebook. Attaching a saved training
 notebook's Output directly requires no export. Rebuild/publish the wheelhouse
 after changes to the inference code; models and package dependencies are separate.
 
