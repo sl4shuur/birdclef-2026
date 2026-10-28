@@ -53,11 +53,14 @@ class BirdClefModule(L.LightningModule, ABC):
             on_epoch=True,
             batch_size=len(batch[0]),
             sync_dist=True,
+            prog_bar=True,
         )
         return loss
 
     def validation_step(self, batch: TrainingBatch, batch_idx: int) -> None:
-        self.log("val/loss", self.loss(batch), batch_size=len(batch[0]), sync_dist=True)
+        self.log(
+            "val/loss", self.loss(batch), batch_size=len(batch[0]), sync_dist=True, prog_bar=True
+        )
 
     def predict_step(self, batch: torch.Tensor, batch_idx: int) -> torch.Tensor:
         return self.predict_batch(batch).detach().cpu()

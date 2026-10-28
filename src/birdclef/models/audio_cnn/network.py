@@ -112,7 +112,7 @@ class AudioCNNModule(BirdClefModule):
         inputs, targets = batch
         logits = self(inputs)
         loss = self.criterion(logits, targets)
-        self.log("val/loss", loss, batch_size=len(inputs), sync_dist=True)
+        self.log("val/loss", loss, batch_size=len(inputs), sync_dist=True, prog_bar=True)
         self._validation.append((targets.detach(), logits.sigmoid().detach().float()))
 
     def on_validation_epoch_end(self) -> None:
@@ -138,5 +138,5 @@ class AudioCNNModule(BirdClefModule):
         ids = np.arange(len(targets))
         solution.insert(0, ROW_ID, ids)
         submission.insert(0, ROW_ID, ids)
-        self.log("val/auc", score(solution, submission), sync_dist=True)
+        self.log("val/auc", score(solution, submission), sync_dist=True, prog_bar=True)
         self.log("val/auc_classes", int(np.count_nonzero(targets.sum(axis=0))), sync_dist=True)

@@ -87,7 +87,7 @@ def fit_module(
         callbacks=[
             *callbacks,
             LearningRateMonitor(logging_interval="epoch"),
-            TQDMProgressBar(refresh_rate=10),
+            TQDMProgressBar(leave=False),
         ],
     )
     run.tracker.log_hyperparams(
@@ -125,7 +125,7 @@ def predict_module(
         **resolve_runtime(runtime).model_copy(update={"devices": 1}).model_dump(),
         logger=False,
         enable_checkpointing=False,
-        callbacks=[TQDMProgressBar(refresh_rate=10)],
+        callbacks=[TQDMProgressBar(leave=False)],
     )
     batches = trainer.predict(module, loader, ckpt_path=best, weights_only=False)
     if not batches:
