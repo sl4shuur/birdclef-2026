@@ -74,7 +74,7 @@ class SplitConfig(ConfigModel):
 
 class TrackingConfig(ConfigModel):
     project: str = "birdclef-2026"
-    entity: str | None = None
+    entity: str | None = "dmykhailov-kyiv-school-of-economics"
     offline: bool = True
     api_key: SecretStr | None = None
 
