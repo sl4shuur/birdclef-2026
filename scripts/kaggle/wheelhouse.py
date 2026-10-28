@@ -13,7 +13,6 @@ from scripts.kaggle.dataset import STAGE, download_wheels, upload, write_dataset
 from scripts.kaggle.image import (
     FREEZE,
     missing_from_image,
-    read_pins,
     shared_with_image,
     write_pins,
 )
@@ -43,7 +42,7 @@ def main() -> None:
     type=click.Path(path_type=Path, exists=True, file_okay=False),
     help="Prepared audio artifacts; defaults to <data.output_dir>/data_prep.",
 )
-def build(prepared_dir: Path | None) -> None:
+def build(prepared_dir: Path | None) -> str:
     """Bundle the current package, prepared data and ImageNet weights for an online GPU run."""
     import torch
     from torchvision.models import EfficientNet_B0_Weights
@@ -54,7 +53,7 @@ def build(prepared_dir: Path | None) -> None:
         if sha256((prepared_dir / name).read_bytes()).hexdigest() != expected:
             raise click.ClickException(f"Preparation artifact checksum mismatch: {name}")
 
-    stage = PROJECT_ROOT / "build" / "kaggle-run"
+    stage = STAGE
     version = build_wheel(stage)
     (stage / "requirements.txt").write_text(project_requirement(version) + "\n", encoding="utf-8")
     prepared = stage / "data_prep"
@@ -70,6 +69,7 @@ def build(prepared_dir: Path | None) -> None:
     shutil.copyfile(Path(torch.hub.get_dir()) / "checkpoints" / filename, cache / filename)
     archive = shutil.make_archive(str(PROJECT_ROOT / "build" / "birdclef-kaggle"), "zip", stage)
     click.secho(f"Ready for Kaggle Dataset upload: {archive}", fg="green")
+    return version
 
 
 @main.command()
@@ -99,24 +99,13 @@ def pin() -> None:
     is_flag=True,
     help="Create the first Dataset version instead of updating an existing one.",
 )
-def publish(message: str | None, dry_run: bool, create: bool) -> None:
-    """Upload birdclef and the packages the image lacks as a new dataset version."""
-    click.secho(
-        "Checking pins against the Kaggle image (resolving shared dependencies)...", fg="yellow"
-    )
-    if read_pins() != shared_with_image():
-        raise click.ClickException(
-            "The pins are stale. Run: uv run python -m scripts.kaggle.wheelhouse pin"
-        )
-    click.secho("Pins match the image.", fg="green")
-
-    click.echo(f"Building the birdclef wheel in a fresh staging directory: {STAGE}...")
-    version = build_wheel(STAGE)
-    click.secho(f"Built birdclef=={version}.", fg="green")
-
-    click.echo("Resolving dependencies missing from the Kaggle image...")
+@click.pass_context
+def publish(context: click.Context, message: str | None, dry_run: bool, create: bool) -> None:
+    """Publish the training bundle with missing or incompatible image dependencies."""
+    click.echo("Resolving dependencies to install or upgrade on Kaggle...")
     missing = missing_from_image()
-    click.echo(f"Resolved {len(missing)} packages to ship alongside birdclef.")
+    click.secho(f"Resolved {len(missing)} packages to ship alongside birdclef.", fg="green")
+    version = context.invoke(build, prepared_dir=None)
     download_wheels(missing)
 
     click.echo("Writing requirements.txt and dataset metadata...")
@@ -127,10 +116,11 @@ def publish(message: str | None, dry_run: bool, create: bool) -> None:
         return
 
     notes = message or run("git", "log", "-1", "--format=%s").strip()
-    click.echo(
+    click.secho(
         "Creating wheelhouse Dataset..."
         if create
-        else "Uploading new wheelhouse Dataset version..."
+        else "Uploading new wheelhouse Dataset version...",
+        fg="yellow"
     )
     upload(notes, create=create)
     click.secho("Wheelhouse published.", fg="green")

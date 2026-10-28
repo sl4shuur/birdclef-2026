@@ -37,35 +37,31 @@ def image_python() -> str:
     return match[1]
 
 
-def shared_with_image() -> dict[str, str]:
-    """The image's versions of the packages birdclef installs that the image also has."""
+def _resolve_image() -> tuple[dict[str, str], dict[str, str]]:
+    """Prefer installed versions, upgrading incompatible packages and their dependencies."""
     image = parse_freeze(_read_freeze())
-    constraints = "".join(
+    if "torch" not in image:
+        raise click.ClickException("The snapshot has no PyTorch. Take a GPU image snapshot again.")
+    preferences = "".join(
         f"{name}=={version}\n" for name, version in image.items() if version and name != "torch"
     )
+    # Keep the image's PyTorch and CUDA stack out of the wheelhouse.
+    project = resolve(
+        str(PYPROJECT), preferences=preferences, overrides='torch ; sys_platform == "never"\n'
+    )
+    return image, project
 
-    # torch brings its CUDA packages, whose versions on the image can clash. We never pin torch.
-    drop_torch = 'torch ; sys_platform == "never"\n'
 
-    project = resolve(str(PYPROJECT), constraints=constraints, overrides=drop_torch)
-    return {name: version for name, version in project.items() if name in image and name != "torch"}
+def shared_with_image() -> dict[str, str]:
+    """Project dependencies that can reuse the image's installed versions."""
+    image, project = _resolve_image()
+    return {name: version for name, version in project.items() if image.get(name) == version}
 
 
 def missing_from_image() -> dict[str, str]:
-    """Everything birdclef and the notebooks need that the image lacks."""
-    image = parse_freeze(_read_freeze())
-    # A requirement with a marker that never holds is dropped from the resolution.
-    # That leaves out the image's packages, and torch's CUDA dependencies with them.
-    if "torch" not in image:
-        raise click.ClickException("The snapshot has no PyTorch. Take a GPU image snapshot again.")
-    overrides = "".join(f'{name} ; sys_platform == "never"\n' for name in image)
-    return resolve(str(PYPROJECT), overrides=overrides)
-
-
-def read_pins() -> dict[str, str]:
-    text = PYPROJECT.read_text(encoding="utf-8")
-    block = text[text.index(PINS_BEGIN) : text.index(PINS_END)]
-    return dict(re.findall(r'"([^"=]+)==([^"]+)"', block))
+    """Project dependencies that must be installed or upgraded on the image."""
+    image, project = _resolve_image()
+    return {name: version for name, version in project.items() if image.get(name) != version}
 
 
 def write_pins(pins: dict[str, str]) -> None:
@@ -77,23 +73,25 @@ def write_pins(pins: dict[str, str]) -> None:
     )
 
 
-def resolve(*sources: str, constraints: str = "", overrides: str = "") -> dict[str, str]:
+def resolve(*sources: str, preferences: str = "", overrides: str = "") -> dict[str, str]:
     """What `uv pip compile` installs on Kaggle's Linux image for `sources`."""
     # --no-config keeps the old pins in pyproject.toml from conflicting with a new image.
     with tempfile.TemporaryDirectory() as tmp:
-        options = []
-        for flag, text in (("--constraints", constraints), ("--override", overrides)):
-            if text:
-                file = Path(tmp) / f"{flag[2:]}.txt"
-                file.write_text(text, encoding="utf-8")
-                options += [flag, str(file)]
-        compiled = run(
+        output = Path(tmp) / "requirements.txt"
+        # uv treats existing output pins as preferences, rather than hard constraints.
+        output.write_text(preferences, encoding="utf-8")
+        options = ["--output-file", str(output)]
+        if overrides:
+            file = Path(tmp) / "overrides.txt"
+            file.write_text(overrides, encoding="utf-8")
+            options += ["--override", str(file)]
+        run(
             *("uv", "pip", "compile", *sources, *options),
             *(flag for extra in EXTRAS for flag in ("--extra", extra)),
             *("--python-version", image_python(), "--python-platform", "x86_64-manylinux_2_28"),
             *("--no-header", "--no-annotate", "--quiet", "--no-config", "--no-sources"),
         )
-    return parse_freeze(compiled)
+        return parse_freeze(output.read_text(encoding="utf-8"))
 
 
 def parse_freeze(text: str) -> dict[str, str]:

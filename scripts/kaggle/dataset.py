@@ -1,12 +1,14 @@
 import json
 
+import rich_click as click
+
 from birdclef.config import PROJECT_ROOT
 from scripts.kaggle.image import image_python
 from scripts.kaggle.shell import kaggle
 from scripts.wheelhouse_common import project_requirement, run
 
 STAGE = PROJECT_ROOT / "build" / "kaggle-wheelhouse"
-DATASET = "username/test-wheelhouse"
+DATASET = "denysmykhailov/birdclef-2026-wheelhouse"
 
 
 def download_wheels(packages: dict[str, str]) -> None:
@@ -29,7 +31,7 @@ def write_dataset_files(version: str, packages: dict[str, str]) -> str:
     requirements = "\n".join([project_requirement(version), *specs(packages)]) + "\n"
     (STAGE / "requirements.txt").write_text(requirements, encoding="utf-8")
     metadata = {
-        "title": "Kaggle starter wheelhouse",
+        "title": "BirdCLEF 2026",
         "id": DATASET,
         "licenses": [{"name": "other"}],
     }
@@ -40,9 +42,15 @@ def write_dataset_files(version: str, packages: dict[str, str]) -> str:
 def upload(message: str, *, create: bool = False) -> None:
     # The CLI builds a file name from the path it gets, so run it inside the folder.
     if create:
-        kaggle("datasets", "create", "-p", ".", cwd=STAGE)
+        response = kaggle("datasets", "create", "-p", ".", "-r", "zip", "-t", cwd=STAGE)
     else:
-        kaggle("datasets", "version", "-p", ".", "-m", message, cwd=STAGE)
+        response = kaggle(
+            "datasets", "version", "-p", ".", "-m", message, "-r", "zip", "-t", cwd=STAGE
+        )
+    click.echo(response)
+    # Kaggle can report an API error while returning a successful process exit code.
+    if "creation error:" in response.lower():
+        raise click.ClickException("Kaggle rejected the upload; see its response above.")
 
 
 def specs(packages: dict[str, str]) -> list[str]:
