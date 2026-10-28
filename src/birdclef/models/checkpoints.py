@@ -78,6 +78,14 @@ class FitState(BaseModel):
             raise FileNotFoundError(path)
         return path
 
+    def inference_path(self, output_dir: Path) -> Path:
+        """Prefer the recorded best; interrupted runs can use their last checkpoint."""
+        if self.best_checkpoint is not None:
+            return self.best_path(output_dir)
+        return self.model_copy(update={"best_checkpoint": "checkpoints/last.ckpt"}).best_path(
+            output_dir
+        )
+
 
 def read_fit_state(output_dir: Path) -> FitState:
     path = output_dir / "fit.json"

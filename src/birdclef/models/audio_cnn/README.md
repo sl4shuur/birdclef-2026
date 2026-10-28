@@ -135,7 +135,9 @@ signature and checkpoint class metadata.
 
 `AudioCNN.from_run` restores architecture without downloading pretrained weights;
 `predict` loads the checkpoint and preserves manifest row IDs/order. It needs no
-targets. Build windows from actual files with `competition.soundscape_windows`
+targets. Interrupted runs without a recorded best checkpoint use
+`checkpoints/last.ckpt`; the training resume logic remains strict about best/last
+state. Build windows from actual files with `competition.soundscape_windows`
 and use the submission helpers to align and validate predictions. The notebook's
 optional CPU benchmark predicts one real minute, including checkpoint loading,
 decode, Log-Mel and inference. Its CSV and timing check local plumbing, not

@@ -55,7 +55,7 @@ class AudioCNN(BirdClefModel):
         model._module = AudioCNNModule(
             saved.model, saved.lr_scheduler, classes=classes, initialize_pretrained=False
         )
-        model._best = read_fit_state(output_dir).best_path(output_dir)
+        model._best = read_fit_state(output_dir).inference_path(output_dir)
         return model
 
     def fit(self, train: pd.DataFrame, valid: pd.DataFrame, context: RunContext) -> None:
