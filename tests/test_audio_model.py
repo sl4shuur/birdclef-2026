@@ -286,6 +286,13 @@ def test_validation_is_pooled_and_checkpoint_restores_predictions_without_downlo
     assert result.columns.tolist() == ["row_id", "a", "b"]
     assert result.row_id.tolist() == ["clip_5"]
     np.testing.assert_allclose(result[["a", "b"]], expected.numpy(), atol=1e-6)
+    from birdclef.submission import predict_runs
+
+    ensemble = predict_runs(
+        [tmp_path, tmp_path], manifest, result[["row_id", "b", "a"]], weights=[1, 3]
+    )
+    assert ensemble.columns.tolist() == ["row_id", "b", "a"]
+    np.testing.assert_allclose(ensemble[["a", "b"]], expected.numpy(), atol=1e-6)
     assert all(weights is None for weights in seen)
     (tmp_path / "classes.json").write_text(json.dumps(["b", "a"]))
     with pytest.raises(ValueError, match="class order"):
