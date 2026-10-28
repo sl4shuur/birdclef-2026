@@ -1,7 +1,14 @@
-"""Ship the project and missing dependencies to offline Kaggle notebooks."""
+"""Build a training bundle or publish an offline Kaggle wheelhouse."""
+
+import json
+import shutil
+from hashlib import sha256
+from pathlib import Path
+from urllib.parse import urlsplit
 
 import rich_click as click
 
+from birdclef.config import PROJECT_ROOT, get_config
 from scripts.kaggle.dataset import STAGE, download_wheels, upload, write_dataset_files
 from scripts.kaggle.image import (
     FREEZE,
@@ -11,7 +18,7 @@ from scripts.kaggle.image import (
     write_pins,
 )
 from scripts.kaggle.kernel import pip_freeze_on_kaggle
-from scripts.wheelhouse_common import CONTEXT_SETTINGS, build_wheel, run
+from scripts.wheelhouse_common import CONTEXT_SETTINGS, build_wheel, project_requirement, run
 
 
 def _pin() -> None:
@@ -28,6 +35,41 @@ def _pin() -> None:
 )
 def main() -> None:
     """Ship the project package and the packages the Kaggle image lacks."""
+
+
+@main.command()
+@click.option(
+    "--prepared-dir",
+    type=click.Path(path_type=Path, exists=True, file_okay=False),
+    help="Prepared audio artifacts; defaults to <data.output_dir>/data_prep.",
+)
+def build(prepared_dir: Path | None) -> None:
+    """Bundle the current package, prepared data and ImageNet weights for an online GPU run."""
+    import torch
+    from torchvision.models import EfficientNet_B0_Weights
+
+    prepared_dir = prepared_dir or get_config(verbose=False).data.output_dir / "data_prep"
+    manifest = json.loads((prepared_dir / "manifest.json").read_text(encoding="utf-8"))
+    for name, expected in manifest["artifacts_sha256"].items():
+        if sha256((prepared_dir / name).read_bytes()).hexdigest() != expected:
+            raise click.ClickException(f"Preparation artifact checksum mismatch: {name}")
+
+    stage = PROJECT_ROOT / "build" / "kaggle-run"
+    version = build_wheel(stage)
+    (stage / "requirements.txt").write_text(project_requirement(version) + "\n", encoding="utf-8")
+    prepared = stage / "data_prep"
+    prepared.mkdir()
+    for name in ["manifest.json", *manifest["artifacts_sha256"]]:
+        shutil.copyfile(prepared_dir / name, prepared / name)
+
+    weights = EfficientNet_B0_Weights.IMAGENET1K_V1
+    weights.get_state_dict(progress=True, check_hash=True)
+    filename = Path(urlsplit(weights.url).path).name
+    cache = stage / "torch" / "hub" / "checkpoints"
+    cache.mkdir(parents=True)
+    shutil.copyfile(Path(torch.hub.get_dir()) / "checkpoints" / filename, cache / filename)
+    archive = shutil.make_archive(str(PROJECT_ROOT / "build" / "birdclef-kaggle"), "zip", stage)
+    click.secho(f"Ready for Kaggle Dataset upload: {archive}", fg="green")
 
 
 @main.command()

@@ -2,6 +2,7 @@
 
 import shutil
 import subprocess
+import tomllib
 from pathlib import Path
 
 import rich_click as click
@@ -9,7 +10,7 @@ import rich_click as click
 from birdclef.cli_common import CONTEXT_SETTINGS as CONTEXT_SETTINGS
 from birdclef.config import PROJECT_ROOT
 
-EXTRAS = ("notebooks", "deep-learning")
+EXTRAS = ("notebooks", "audio", "deep-learning")
 
 
 def run(*command: str, cwd: Path = PROJECT_ROOT) -> str:
@@ -30,8 +31,9 @@ def build_wheel(stage: Path) -> str:
     shutil.rmtree(stage, ignore_errors=True)
     run("uv", "build", "--wheel", "--out-dir", str(stage), "--quiet")
     (stage / ".gitignore").unlink(missing_ok=True)
-    return next(stage.glob("birdclef-*.whl")).name.split("-")[1]
+    return next(stage.glob("*.whl")).name.split("-")[1]
 
 
 def project_requirement(version: str) -> str:
-    return f"birdclef[{','.join(EXTRAS)}]=={version}"
+    metadata = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    return f"{metadata['project']['name']}[{','.join(EXTRAS)}]=={version}"
