@@ -32,6 +32,33 @@ def first_conv(features: nn.Sequential) -> nn.Conv2d:
     return convolution
 
 
+def test_two_process_training_unfreezes_synchronously_and_scores_without_padding(tmp_path):
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    worker = Path(__file__).with_name("ddp_audio_worker.py")
+    environment = {
+        **os.environ,
+        "OMP_NUM_THREADS": "1",
+        "MKL_NUM_THREADS": "1",
+        "OPENBLAS_NUM_THREADS": "1",
+        "WANDB_MODE": "offline",
+    }
+    result = subprocess.run(
+        [sys.executable, str(worker), str(tmp_path), "cpu"],
+        env=environment,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=180,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert json.loads((tmp_path / "ddp-check.json").read_text())["status"] == "passed"
+
+
 @pytest.fixture(autouse=True)
 def limited_threads():
     previous = torch.get_num_threads()

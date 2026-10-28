@@ -69,14 +69,17 @@ def test_wandb_prefers_process_secret_and_closes_initialization_failure(tmp_path
     run.finish.assert_called_once_with(exit_code=1)
 
 
-def test_audio_fit_cli_uses_wandb_and_saves_secret_free_artifacts(tmp_path, monkeypatch):
+@pytest.mark.parametrize("rank", [0, 1])
+def test_audio_fit_cli_uses_wandb_and_saves_secret_free_artifacts(tmp_path, monkeypatch, rank):
     import pandas as pd
     import wandb
+    from lightning.pytorch.utilities import rank_zero_only
 
     from birdclef.models import AudioCNN, AudioExperimentConfig
     from birdclef.models.audio_cnn.fit import fit
 
     tracker = Mock()
+    monkeypatch.setattr(rank_zero_only, "rank", rank)
     tracker.experiment.id = "test-run"
     artifact = Mock()
     monkeypatch.setattr(wandb, "Artifact", Mock(return_value=artifact))
@@ -149,6 +152,10 @@ def test_audio_fit_cli_uses_wandb_and_saves_secret_free_artifacts(tmp_path, monk
     assert received["context"].protocol == "file-gkf5/fold-2/smoke"
     assert "environment-secret" not in result.output
     assert "environment-secret" not in (received["directory"] / "model-config.json").read_text()
+    if rank != 0:
+        tracker.log_table.assert_not_called()
+        tracker.experiment.log_artifact.assert_not_called()
+        return
     tracker.log_table.assert_called_once()
     tracker.experiment.log_artifact.assert_called_once_with(artifact, aliases=["best"])
     names = {call.kwargs["name"] for call in artifact.add_file.call_args_list}

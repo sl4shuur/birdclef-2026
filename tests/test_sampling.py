@@ -27,6 +27,35 @@ def test_sampler_reproducibility():
     assert draw() == draw()
 
 
+def test_ddp_shards_the_same_weighted_draw_and_resumes_its_epoch():
+    from lightning.fabric.utilities.distributed import DistributedSamplerWrapper
+
+    def sampler():
+        return SourceWeightedRandomSampler(
+            100,
+            2,
+            soundscape_probability=0.3,
+            num_samples=1002,
+            generator=torch.Generator().manual_seed(42),
+        )
+
+    expected = sampler()
+    expected.set_epoch(3)
+    full = list(expected)
+    shards = []
+    for rank in range(2):
+        shard = DistributedSamplerWrapper(sampler(), num_replicas=2, rank=rank, seed=42)
+        shard.set_epoch(3)
+        values = list(shard)
+        assert len(values) == 501
+        shards.extend(values)
+    assert sorted(shards) == sorted(full)
+    expected.set_epoch(3)
+    assert list(expected) == full
+    expected.set_epoch(4)
+    assert list(expected) != full
+
+
 @pytest.mark.parametrize("probability", [-0.1, 1.1, float("nan")])
 def test_rejects_invalid_probability(probability):
     with pytest.raises(ValueError):
