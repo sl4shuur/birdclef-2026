@@ -9,13 +9,19 @@ under `perch-cache/`; set `data.cache_dir` to that folder, which contains
 
 For Colab, upload `build/perch-cache.zip` to
 `/content/drive/Shareddrives/BirdCLEF2026/data/cache/perch-cache.zip`.
-The Colab starter restores that archive into its local cache.
+Unpack it into the VM's cache folder, preserving `perch-center-v1/` and `index.json`.
+The Colab starter is outdated; see the Colab section below.
 
-For offline submission, add `build/perch-mlp-model.zip` to the existing models
-Dataset and replace the wheelhouse contents with `build/perch-offline-runtime.zip`.
-Use `notebooks/kaggle/perch_inference.ipynb`, CPU and Internet OFF. Attach the
+For offline submission, export the saved Perch run:
+
+```bash
+uv run python -m birdclef.submission.export --run outputs/perch/mlp --all
+```
+
+Upload `build/birdclef-models.zip` to the existing models Dataset. Rebuild the
+wheelhouse after code changes, including the `perch` extra for ONNX Runtime.
+Use `notebooks/kaggle/inference.ipynb`, CPU and Internet OFF. Attach the
 competition, models and wheelhouse only; no cache Dataset is needed.
-Model and wheelhouse uploads were left to the user; only the cache was published.
 
 ## Perch embeddings
 
@@ -83,6 +89,7 @@ older versions. This project does not use `google-adk`.
 uv run python -m scripts.colab.wheelhouse build
 ```
 
-Upload `build/birdclef-colab.zip` and follow `notebooks/colab/starter.ipynb`.
-The starter still points to the removed baseline module. Update its training
-command before use; it is not a working training example yet.
+The bundle can be installed in Colab, but `notebooks/colab/starter.ipynb` still
+imports removed baseline classes and calls the removed baseline training CLI.
+It is not a working training example until those cells are updated. Use the
+current classifier API and CLI shown in the local notebooks when adapting it.

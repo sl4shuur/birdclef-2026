@@ -6,7 +6,7 @@ A deep-learning project for the [BirdCLEF+ 2026 Kaggle competition](https://www.
 
 The task is **multi-label audio classification**: predict the presence of 234 animal classes in 5-second soundscape segments, evaluated using macro-averaged ROC-AUC excluding classes without positive targets.
 
-The project supports **local, Kaggle, and Google Colab** workflows, with modular training, evaluation, and inference pipelines.
+The project supports **local and Kaggle** training and inference. Colab bundle tooling and path defaults are available, but its starter notebook still needs an API update; see [remote setup](docs/remote.md).
 
 ## TODO
 
@@ -84,7 +84,7 @@ uv run pyright
 uv run pytest
 ```
 
-`pytest` runs fast checks. Use `uv run pytest -m slow` for training, checkpoint, DDP and fresh-process checks. Use `uv run pytest -m ""` to run both groups.
+`pytest` runs fast checks. Use `uv run pytest -m slow` for training, checkpoint, DDP and fresh-process checks. Before merging, run both groups with `uv run pytest -o "addopts="`, including the Perch training/resume/export and DDP integration checks.
 
 ## Prepare and train
 

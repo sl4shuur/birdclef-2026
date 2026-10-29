@@ -66,7 +66,7 @@ Set `BCLEF_DATA__CACHE_DIR` or `config.data.cache_dir`:
 | --- | --- | --- |
 | Local | `data/cache` | Normal folder |
 | Colab | `/content/drive/Shareddrives/BirdCLEF2026/data/cache` | Mount Drive first |
-| Kaggle | `/kaggle/working/cache` | Attach a complete cache Dataset and point to `/kaggle/input/<dataset>/cache` |
+| Kaggle | `/kaggle/working/cache` | Attach a complete cache Dataset and point to the folder containing `perch-center-v1/` |
 
 Each window is one float32 `.npy` entry under
 `perch-center-v1/<encoder SHA-256>/`. Keys contain the source, filename, crop offset
@@ -75,20 +75,27 @@ head or fold reuses existing windows. Writes are atomic; interrupted extraction
 continues from missing entries. A complete cache needs no writes or ONNX session.
 An incomplete cache needs a writable folder.
 
+For the normal Lightning script launch, one parent process prepares the cache
+before DDP workers start. Workers only read a complete indexed cache and reject
+missing entries instead of extracting concurrently. With an external launcher
+such as `torchrun`, prepare all training and validation embeddings in one process
+first (for example, run the same config with `runtime.devices=1`). Use the same
+cache directory in every worker. This does not coordinate separate cache-building jobs.
+
 Each encoder namespace also stores `index.json`, mapping source/filename/crop to
 the existing array filename. Once indexed, complete caches can be loaded without
 the source audio. Existing arrays are indexed on first use while audio is available;
 Perch is not rerun. Include `index.json` when copying or archiving the cache, and
 initialize it before attaching a cache read-only.
 
-Audio is assumed to be immutable competition data. A replacement with the same
-filename and byte length is not detected: clear the cache after changing audio.
+Audio is assumed to be immutable competition data. After indexing, source audio
+is not checked again, even if its byte length changes: clear the cache after replacing audio.
 Change the cache namespace when changing decoding or crop policy. Each training
 split loads its embedding matrix into RAM; audio waveforms are processed in batches.
 
 For comparison with EfficientNet, keep folds, seeds and source sampling fixed.
 Account for Perch's fixed focal crop versus EfficientNet's random training crops.
-The notebook starts in smoke mode and still validates the full fold. First-time
+Set `SMOKE_RUN=True` for a short check that still validates the full fold. First-time
 validation extraction can take several minutes. A smoke AUC is only a pipeline check.
 
 ## Offline inference and export
@@ -103,6 +110,6 @@ of run. Rebuild the wheelhouse to include the new `perch` extra before offline u
 The notebook includes an uncached CPU minute check. Measure full inference in the
 Kaggle environment before treating a local timing as a submission budget estimate.
 
-For GPU caching and the first MLP on Colab, use
-[the Colab notebook](../../../../notebooks/colab/starter.ipynb). It stages audio
-and cache on local VM storage and saves archives to the Shared Drive.
+The [Colab starter](../../../../notebooks/colab/starter.ipynb) still uses the removed
+baseline API and is not a working Perch example. See [remote setup](../../../../docs/remote.md)
+for its current status; adapt the local Perch notebook to the installed bundle.

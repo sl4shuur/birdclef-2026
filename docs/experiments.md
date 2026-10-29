@@ -25,7 +25,7 @@ Training length and checkpoints can differ. The table does not show the effect o
 | Perch v2 — 4th-place solution writeup standalone LB (split unspecified) | -                                  |                        - |       ~0.928 |             - |
 
 The trained MLP improves on the native-head zero-shot submission by **0.06501 public**
-and **0.05494 private** ROC-AUC. It has the highest recorded scores in this document.
+and **0.05494 private** ROC-AUC. It has the highest measured scores among our submissions.
 Training stopped early after 10 epochs. The encoder stayed frozen; only the head trained.
 
 The head uses LayerNorm, a 512-unit hidden layer, ReLU, dropout 0.3 and an output layer for 234 classes. Head LR: `1e-3`; weight decay: `0.01`; batch size: `256`; soundscape sampling probability: `0.1`; seed: `42`.
