@@ -1,4 +1,4 @@
-# BirdCLEF+ 2026 — Short Project Report
+# BirdCLEF+ 2026
 
 **Project:** [GitHub repository](https://github.com/sl4shuur/birdclef-2026)  
 **Competition:** [BirdCLEF+ 2026](https://www.kaggle.com/competitions/birdclef-2026)  
