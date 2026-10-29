@@ -77,6 +77,12 @@ head or fold reuses existing windows. Writes are atomic; interrupted extraction
 continues from missing entries. A complete cache needs no writes or ONNX session.
 An incomplete cache needs a writable folder.
 
+Each encoder namespace also stores `index.json`, mapping source/filename/crop to
+the existing array filename. Once indexed, complete caches can be loaded without
+the source audio. Existing arrays are indexed on first use while audio is available;
+Perch is not rerun. Include `index.json` when copying or archiving the cache, and
+initialize it before attaching a cache read-only.
+
 Audio is assumed to be immutable competition data. A replacement with the same
 filename and byte length is not detected: clear the cache after changing audio.
 Change the cache namespace when changing decoding or crop policy. Each training

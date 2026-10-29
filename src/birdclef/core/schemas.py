@@ -45,16 +45,3 @@ class DataSplit(BaseModel):
     train: pd.DataFrame
     val: pd.DataFrame
     manifest: SplitManifest
-
-
-type Phase = Literal["training", "evaluating", "complete", "interrupted", "failed"]
-
-
-class RunState(BaseModel):
-    """Saved as `state.json`: which run a folder belongs to, and how far it got."""
-
-    version: Literal[1] = 1
-    run_id: str
-    fingerprint: str
-    experiment_name: str
-    phase: Phase = "training"

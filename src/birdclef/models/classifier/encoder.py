@@ -4,9 +4,10 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 
 import pandas as pd
-from torch.utils.data import ConcatDataset, Dataset
+from torch.utils.data import Dataset
 
 from birdclef.data import InferenceSoundscapeDataset, audio_training_datasets
+from birdclef.data.sampling import MixedSourceDataset
 from birdclef.experiment import RunContext
 from birdclef.models.classifier.config import AudioExperimentConfig
 from birdclef.models.classifier.network import AudioClassifierModule
@@ -25,7 +26,7 @@ class ClassifierEncoder(ABC):
 
     def training_data(
         self, train: pd.DataFrame, valid: pd.DataFrame, context: RunContext
-    ) -> tuple[ConcatDataset, Dataset]:
+    ) -> tuple[MixedSourceDataset, Dataset]:
         training, validation = audio_training_datasets(
             train,
             valid,

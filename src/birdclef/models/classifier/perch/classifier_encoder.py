@@ -7,10 +7,11 @@ from pathlib import Path
 import pandas as pd
 from lightning.pytorch.utilities import rank_zero_only
 from torch import nn
-from torch.utils.data import ConcatDataset, Dataset, TensorDataset
+from torch.utils.data import Dataset, TensorDataset
 
 from birdclef.data import FeatureDataset, InferenceSoundscapeDataset
 from birdclef.data.features import feature_tensor
+from birdclef.data.sampling import MixedSourceDataset
 from birdclef.experiment import RunContext
 from birdclef.models.classifier.encoder import ClassifierEncoder
 from birdclef.models.classifier.network import AudioClassifierModule, classification_head
@@ -24,7 +25,7 @@ class FrozenPerchEncoder(ClassifierEncoder):
 
     def training_data(
         self, train: pd.DataFrame, valid: pd.DataFrame, context: RunContext
-    ) -> tuple[ConcatDataset, Dataset]:
+    ) -> tuple[MixedSourceDataset, Dataset]:
         assert self.config.model.encoder_path is not None
         self.encoder = PerchEncoder(
             self.config.model.encoder_path, device=self.config.model.encoder_device
@@ -68,20 +69,23 @@ class FrozenPerchEncoder(ClassifierEncoder):
         self,
         train: pd.DataFrame,
         valid: pd.DataFrame,
-        training: ConcatDataset,
+        training: MixedSourceDataset,
         validation: Dataset,
-    ) -> tuple[ConcatDataset, TensorDataset]:
-        datasets = []
-        frames = [train.loc[train.source.eq(source)] for source in ("focal", "soundscape")]
-        for frame, dataset in zip([*frames, valid], [*training.datasets, validation], strict=True):
-            inputs = embeddings(
-                frame, dataset, self.encoder, loader=self.config.loader, cache_dir=self.cache_dir
-            )
-            if self.embedding_dim is not None and inputs.shape[1] != self.embedding_dim:
-                raise ValueError("Training and validation embedding dimensions differ.")
-            self.embedding_dim = inputs.shape[1]
-            datasets.append(TensorDataset(inputs, feature_tensor(frame, self.classes)))
-        return ConcatDataset(datasets[:2]), datasets[2]
+    ) -> tuple[MixedSourceDataset, TensorDataset]:
+        datasets = {
+            source: self._cached_dataset(train.loc[train.source.eq(source)], dataset)
+            for source, dataset in training.by_source.items()
+        }
+        return MixedSourceDataset(datasets), self._cached_dataset(valid, validation)
+
+    def _cached_dataset(self, frame: pd.DataFrame, dataset: Dataset) -> TensorDataset:
+        inputs = embeddings(
+            frame, dataset, self.encoder, loader=self.config.loader, cache_dir=self.cache_dir
+        )
+        if self.embedding_dim is not None and inputs.shape[1] != self.embedding_dim:
+            raise ValueError("Training and validation embedding dimensions differ.")
+        self.embedding_dim = inputs.shape[1]
+        return TensorDataset(inputs, feature_tensor(frame, self.classes))
 
     @rank_zero_only
     def _save_encoder(self, output_dir: Path) -> None:

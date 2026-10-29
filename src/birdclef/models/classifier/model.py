@@ -8,7 +8,7 @@ import lightning as L
 import pandas as pd
 import torch
 from lightning.pytorch.utilities import rank_zero_only
-from torch.utils.data import ConcatDataset, Dataset
+from torch.utils.data import Dataset
 
 from birdclef.competition import ROW_ID, class_columns
 from birdclef.data import (
@@ -16,6 +16,7 @@ from birdclef.data import (
     TrainingDataModule,
     prediction_dataloader,
 )
+from birdclef.data.sampling import MixedSourceDataset
 from birdclef.eval import evaluate, score
 from birdclef.experiment import BirdClefModel, RunContext
 from birdclef.models import (
@@ -93,12 +94,12 @@ class AudioClassifier(BirdClefModel):
             return
         self._save_validation(valid, context)
 
-    def _training_loader(self, training: ConcatDataset, validation: Dataset) -> TrainingDataModule:
+    def _training_loader(
+        self, training: MixedSourceDataset, validation: Dataset
+    ) -> TrainingDataModule:
         config = self.config
-        focal_count = training.cumulative_sizes[0]
         self.sampler = SourceWeightedRandomSampler(
-            focal_count,
-            len(training) - focal_count,
+            training.sources,
             soundscape_probability=config.loader.soundscape_probability,
             generator=torch.Generator().manual_seed(config.loader.seed),
         )

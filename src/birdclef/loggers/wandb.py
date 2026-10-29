@@ -31,7 +31,7 @@ def _open(config: TrackingConfig, run_id: str | None, name: str, save_dir: Path)
 def wandb_run(
     config: TrackingConfig, *, name: str, save_dir: Path, run_id: str | None = None
 ) -> Iterator[WandbLogger]:
-    """Open the W&B run for `run_experiment`. The run is closed on exit, even after an error.
+    """Open the W&B run for training. The run is closed on exit, even after an error.
 
     Without an explicit run_id, persist the identity in wandb-run-id.txt in save_dir.
     Online runs can resume logging; offline launches create local sessions for later sync.

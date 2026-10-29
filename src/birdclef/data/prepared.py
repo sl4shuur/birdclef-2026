@@ -5,10 +5,10 @@ from hashlib import sha256
 from pathlib import Path
 
 import pandas as pd
-from torch.utils.data import ConcatDataset
 
 from birdclef.data.audio import FocalAudioDataset, SoundscapeDataset, Transform
 from birdclef.data.labels import align_targets
+from birdclef.data.sampling import MixedSourceDataset
 from birdclef.processing import log_mel
 
 
@@ -63,7 +63,7 @@ def audio_training_datasets(
     classes: list[str],
     transform: Transform | None = log_mel,
     random_crop: bool = True,
-) -> tuple[ConcatDataset, SoundscapeDataset]:
+) -> tuple[MixedSourceDataset, SoundscapeDataset]:
     """Mixed-source training and soundscape-only validation, with no recording leakage."""
     if train.empty or valid.empty:
         raise ValueError("Training and validation must be nonempty.")
@@ -85,4 +85,4 @@ def audio_training_datasets(
         soundscapes, soundscapes.set_index("row_id")[classes], transform=transform
     )
     validation = SoundscapeDataset(valid, valid.set_index("row_id")[classes], transform=transform)
-    return ConcatDataset([focal_dataset, sc_dataset]), validation
+    return MixedSourceDataset({"focal": focal_dataset, "soundscape": sc_dataset}), validation
