@@ -6,7 +6,7 @@ A deep-learning project for the [BirdCLEF+ 2026 Kaggle competition](https://www.
 
 The task is **multi-label audio classification**: predict the presence of 234 animal classes in 5-second soundscape segments, evaluated using macro-averaged ROC-AUC excluding classes without positive targets.
 
-The project supports **local and Kaggle** training and inference. Colab bundle tooling and path defaults are available, but its starter notebook still needs an API update; see [remote setup](docs/remote.md).
+The project supports **local, Kaggle and Colab** training, with offline CPU inference for Kaggle submissions; see [remote setup](docs/remote.md).
 
 ## TODO
 
@@ -23,7 +23,7 @@ The project supports **local and Kaggle** training and inference. Colab bundle t
 ### 2. Model Improvements
 
 - [x] Explore pretrained audio models, including Perch.
-- [ ] Implement knowledge distillation from a pretrained teacher into a smaller student model.
+- [x] Implement knowledge distillation from a pretrained teacher into a smaller student model.
 - [x] Introduce recurrent layers (GRU/LSTM) for temporal modeling.
 - [x] Experiment with other improvements: regularization, learning rates, and soundscape sampling.
 - [x] Evaluate improvements locally and submit selected candidates to Kaggle.

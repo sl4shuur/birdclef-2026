@@ -13,3 +13,6 @@ assembly and masked recurrent training, using the same encoders and lifecycle.
 Common model settings live in `config.py`; `runs.py` selects the model family
 for the shared `python -m birdclef.models.fit` CLI, export and inference.
 Public imports come from `birdclef.models`; optional ML dependencies load lazily.
+
+[distillation/](distillation/README.md) pretrains an EfficientNet encoder against
+cached Perch features. Supervised fine-tuning and inference use the ordinary classifier.

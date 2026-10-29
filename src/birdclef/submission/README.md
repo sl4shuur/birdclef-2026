@@ -9,6 +9,9 @@ Choose CPU and Internet OFF. Installation uses `--no-index`.
 
 Set `RUN_DIRS` to the model paths printed in the notebook. One run uses one model.
 Several runs average probabilities after aligning IDs and classes.
+Perch heads with the same encoder SHA256 share one in-memory extraction per
+inference call. All 12 windows provide recurrent context; only requested rows
+are returned. No training cache is read or written.
 `WEIGHTS=None` gives equal weights; otherwise give one positive weight per run.
 Loading supports this project's EfficientNet, Perch MLP and recurrent Perch runs, including mixed
 ensembles. Perch exports include `encoder.onnx` and `encoder.json`; rebuild the

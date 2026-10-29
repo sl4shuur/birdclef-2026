@@ -55,7 +55,7 @@ For two GPUs, choose T4 ×2. Batch size and worker count are per GPU.
 `WANDB_OFFLINE=False` enables online tracking. Set it to `True` if you want local
 W&B logs instead. You can upload those logs later with `wandb sync`.
 
-Edit the settings in the notebook. Use Save Version → Save & Run All for a clean
+Edit the settings in the notebook. Use Save Version -> Save & Run All for a clean
 run. Running interactively first and then using Save & Run All trains twice.
 Download the ZIP from Output when the run ends. The run folder also stays in
 `/kaggle/working`.
@@ -85,11 +85,20 @@ older versions. This project does not use `google-adk`.
 
 ## Colab
 
+For distillation, use [perch_distillation.ipynb](../notebooks/colab/perch_distillation.ipynb).
+Select a GPU runtime. Upload a fresh `birdclef-colab.zip` (package and `data_prep`),
+`data/birdclef-audio.zip` (root folders `train_audio/` and `train_soundscapes/`),
+and `data/cache/perch-cache.zip` to `/content/drive/Shareddrives/BirdCLEF2026/`.
+The notebook copies archives to the VM and extracts them locally; checkpoints and
+the final model ZIP are saved on Drive. Add the Colab secret `WANDB_API_KEY` for
+online runs; configure `WANDB_BASE_URL` if using a custom W&B server.
+Run smoke first, then set `SMOKE_RUN=False`. The teacher ONNX is downloaded automatically.
+
 ```bash
 uv run python -m scripts.colab.wheelhouse build
 ```
 
-The bundle can be installed in Colab, but `notebooks/colab/starter.ipynb` still
+The old `notebooks/colab/starter.ipynb` still
 imports removed baseline classes and calls the removed baseline training CLI.
 It is not a working training example until those cells are updated. Use the
 current classifier API and CLI shown in the local notebooks when adapting it.

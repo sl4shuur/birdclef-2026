@@ -137,7 +137,14 @@ class AudioClassifier(BirdClefModel):
         context.tracker.log_metrics({"best/val_auc": auc})
         context.tracker.save()
 
-    def predict(self, frame: pd.DataFrame, context: RunContext | None = None) -> pd.DataFrame:
+    def predict(
+        self,
+        frame: pd.DataFrame,
+        context: RunContext | None = None,
+        *,
+        dataset: Dataset | None = None,
+    ) -> pd.DataFrame:
+        """Predict windows; a prepared dataset can reuse features across ensemble heads."""
         if self._module is None or self._best is None:
             raise RuntimeError("Call fit() or from_run() before predict().")
         classes = self.classes
@@ -145,7 +152,8 @@ class AudioClassifier(BirdClefModel):
             return pd.DataFrame(columns=[ROW_ID, *classes])
         validate_row_ids(frame)
         loader = prediction_dataloader(
-            self.backend.prediction_data(frame), config=self.config.loader
+            dataset if dataset is not None else self.backend.prediction_data(frame),
+            config=self.config.loader,
         )
         predictions = predict_module(
             self._module, loader, runtime=self.config.runtime, best=self._best

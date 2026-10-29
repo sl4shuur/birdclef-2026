@@ -1,8 +1,8 @@
 # Frozen Perch + recurrent classification
 
 Start with [perch_recurrent.ipynb](../../../../notebooks/local/perch_recurrent.ipynb).
-The first baseline is LayerNorm → one bidirectional GRU (128 units per direction)
-→ dropout → linear head. Feature dimension and class count come from data.
+The first baseline is LayerNorm -> one bidirectional GRU (128 units per direction)
+-> dropout -> linear head. Feature dimension and class count come from data.
 `cell="lstm"`, `bidirectional=False` and `recurrent_layers` allow small ablations
 without another training pipeline. There is no residual MLP branch in this baseline.
 
