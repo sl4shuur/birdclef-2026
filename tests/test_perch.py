@@ -21,11 +21,11 @@ from torch.utils.data import Dataset  # noqa: E402
 
 from birdclef.config import LoaderConfig, RuntimeConfig, TrainConfig  # noqa: E402
 from birdclef.data import InferenceSoundscapeDataset  # noqa: E402
+from birdclef.data.embeddings import embeddings  # noqa: E402
 from birdclef.experiment import RunContext  # noqa: E402
 from birdclef.models import AudioClassifier, AudioExperimentConfig, AudioModelConfig  # noqa: E402
-from birdclef.models.classifier.config import EncoderName  # noqa: E402
-from birdclef.models.classifier.perch.cache import embeddings  # noqa: E402
-from birdclef.models.classifier.perch.encoder import PerchEncoder, file_sha256  # noqa: E402
+from birdclef.models.encoders.config import EncoderName  # noqa: E402
+from birdclef.models.encoders.perch import PerchEncoder, file_sha256  # noqa: E402
 from birdclef.submission import predict_runs  # noqa: E402
 from birdclef.submission.export import main as export_models  # noqa: E402
 
@@ -100,7 +100,7 @@ def test_cache_reuses_readonly_entries_after_relocation_and_extracts_only_misses
     _, frame = audio_frames
     encoder = PerchEncoder(encoder_path)
     loader = LoaderConfig(predict_batch_size=2)
-    cache = tmp_path / "cache"
+    cache = tmp_path / "cache" / encoder.sha256
     expected = embeddings(
         frame, InferenceSoundscapeDataset(frame), encoder, loader=loader, cache_dir=cache
     )
@@ -141,7 +141,7 @@ def test_cache_reuses_readonly_entries_after_relocation_and_extracts_only_misses
         InferenceSoundscapeDataset(frame),
         PerchEncoder(encoder_path),
         loader=loader,
-        cache_dir=cache,
+        cache_dir=cache.parent / file_sha256(encoder_path),
     )
     assert calls == [1, 2]
 

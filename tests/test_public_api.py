@@ -27,7 +27,7 @@ def test_lightweight_package_imports_do_not_load_optional_ml_dependencies():
 def test_public_model_imports_resolve_without_circular_dependencies():
     pytest.importorskip("torchvision")
     from birdclef.data import SourceWeightedRandomSampler
-    from birdclef.models import AudioClassifier, AudioCNNModule, BirdClefModule
+    from birdclef.models import AudioClassifier, AudioClassifierModule, BirdClefModule
 
-    assert issubclass(AudioCNNModule, BirdClefModule)
+    assert issubclass(AudioClassifierModule, BirdClefModule)
     assert callable(AudioClassifier) and callable(SourceWeightedRandomSampler)

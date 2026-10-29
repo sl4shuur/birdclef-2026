@@ -17,14 +17,22 @@ from torch.optim import AdamW  # noqa: E402
 from birdclef.config import LoaderConfig, LRSchedulerConfig, RuntimeConfig  # noqa: E402
 from birdclef.data.audio import read_audio_window  # noqa: E402
 from birdclef.data.prepared import audio_training_datasets, load_audio_split  # noqa: E402
-from birdclef.models.classifier.audio_cnn import network  # noqa: E402
-from birdclef.models.classifier.audio_cnn.network import AudioCNNModule  # noqa: E402
+from birdclef.models.classifier.backends import EfficientNetBackend  # noqa: E402
 from birdclef.models.classifier.config import AudioExperimentConfig, AudioModelConfig  # noqa: E402
 from birdclef.models.classifier.model import AudioClassifier  # noqa: E402
+from birdclef.models.encoders import efficientnet as network  # noqa: E402
 from birdclef.processing.audio import log_mel  # noqa: E402
 
 
-def first_conv(features: nn.Sequential) -> nn.Conv2d:
+def make_module(config, lr_scheduler, *, classes, initialize_pretrained=True):
+    backend = EfficientNetBackend(
+        AudioExperimentConfig(model=config, lr_scheduler=lr_scheduler), classes
+    )
+    return backend.module(initialize_pretrained=initialize_pretrained)
+
+
+def first_conv(features: nn.Module) -> nn.Conv2d:
+    assert isinstance(features, nn.Sequential)
     stem = features[0]
     assert isinstance(stem, nn.Sequential)
     convolution = stem[0]
@@ -69,9 +77,10 @@ def limited_threads():
 
 
 def test_network_shapes_and_gradients_reach_encoder_and_head():
-    module = AudioCNNModule(
+    module = make_module(
         AudioModelConfig(pretrained=False), LRSchedulerConfig(), classes=["a", "b"]
     )
+    assert isinstance(module.head, nn.Sequential)
     inputs = torch.randn(2, 1, 128, 497)
     targets = torch.tensor([[1.0, 0.0], [0.0, 1.0]])
     logits = module(inputs)
@@ -94,7 +103,9 @@ def test_frozen_blocks_keep_weights_and_batchnorm_statistics_while_head_trains(l
         unfreeze_epoch=None if last_n is None else 0,
         unfreeze_last_n=last_n,
     )
-    module = AudioCNNModule(config, LRSchedulerConfig(), classes=["a", "b"])
+    module = make_module(config, LRSchedulerConfig(), classes=["a", "b"])
+    assert isinstance(module.encoder, nn.Sequential)
+    assert isinstance(module.head, nn.Sequential)
     module.eval()
     module.train()  # Lightning switches back to training after validation.
     boundary = len(module.encoder) - (last_n or 0)
@@ -134,7 +145,7 @@ def test_gradual_unfreezing_resumes_at_the_right_epoch_with_optimizer_and_schedu
 ):
     config = AudioModelConfig(pretrained=False, unfreeze_epoch=2)
     schedule = LRSchedulerConfig(name=scheduler, t_max=4)
-    module = AudioCNNModule(config, schedule, classes=["a", "b"])
+    module = make_module(config, schedule, classes=["a", "b"])
     encoder_before = {key: value.clone() for key, value in module.encoder.state_dict().items()}
     loader = torch.utils.data.DataLoader(
         torch.utils.data.TensorDataset(
@@ -167,7 +178,7 @@ def test_gradual_unfreezing_resumes_at_the_right_epoch_with_optimizer_and_schedu
             assert trainer.current_epoch == 2
             assert [group["lr"] for group in trainer.optimizers[0].param_groups] == saved_lrs
 
-    resumed = AudioCNNModule(config, schedule, classes=["a", "b"])
+    resumed = make_module(config, schedule, classes=["a", "b"])
     trainer = lightning.Trainer(max_epochs=3, callbacks=[CheckResume()], **options)
     trainer.fit(
         resumed,
@@ -189,12 +200,20 @@ def test_gradual_unfreezing_resumes_at_the_right_epoch_with_optimizer_and_schedu
         {"head_lr": float("nan")},
         {"unfreeze_epoch": -1},
         {"unfreeze_last_n": 0},
-        {"unfreeze_last_n": 10},
     ],
 )
 def test_rejects_invalid_fine_tuning_settings(settings):
     with pytest.raises(ValueError):
         AudioModelConfig(**settings)
+
+
+def test_unfreezing_limit_follows_the_actual_encoder():
+    with pytest.raises(ValueError, match="9 blocks"):
+        make_module(
+            AudioModelConfig(pretrained=False, unfreeze_last_n=10),
+            LRSchedulerConfig(),
+            classes=["a"],
+        )
 
 
 def test_pretrained_stem_averages_rgb_and_offline_initialization_skips_weights(monkeypatch):
@@ -211,11 +230,11 @@ def test_pretrained_stem_averages_rgb_and_offline_initialization_skips_weights(m
 
     monkeypatch.setattr(network, "efficientnet_b0", fake_factory)
     config = AudioModelConfig(pretrained=True)
-    module = AudioCNNModule(config, LRSchedulerConfig(), classes=["a"])
+    module = make_module(config, LRSchedulerConfig(), classes=["a"])
     assert seen[-1] == network.EfficientNet_B0_Weights.IMAGENET1K_V1
     assert first_conv(module.encoder).weight.shape[1] == 1
     assert first_conv(module.encoder).weight.eq(2).all()
-    AudioCNNModule(config, LRSchedulerConfig(), classes=["a"], initialize_pretrained=False)
+    make_module(config, LRSchedulerConfig(), classes=["a"], initialize_pretrained=False)
     assert seen[-1] is None
 
 
@@ -237,7 +256,7 @@ def test_validation_is_pooled_and_checkpoint_restores_predictions_without_downlo
         runtime=RuntimeConfig(accelerator="cpu", devices=1, precision="32-true"),
         loader=LoaderConfig(predict_batch_size=2),
     )
-    module = AudioCNNModule(
+    module = make_module(
         config.model, config.lr_scheduler, classes=["a", "b"], initialize_pretrained=False
     )
     # Each separate batch has no negatives for one species; the full fold is valid.
