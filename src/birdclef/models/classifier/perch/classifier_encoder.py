@@ -26,7 +26,9 @@ class FrozenPerchEncoder(ClassifierEncoder):
         self, train: pd.DataFrame, valid: pd.DataFrame, context: RunContext
     ) -> tuple[ConcatDataset, Dataset]:
         assert self.config.model.encoder_path is not None
-        self.encoder = PerchEncoder(self.config.model.encoder_path)
+        self.encoder = PerchEncoder(
+            self.config.model.encoder_path, device=self.config.model.encoder_device
+        )
         self.fingerprint = self.encoder.sha256
         self.cache_dir = self.config.data.cache_dir
         training, validation = super().training_data(train, valid, context)

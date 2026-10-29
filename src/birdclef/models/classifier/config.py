@@ -1,7 +1,7 @@
 """Audio classification settings and human-named experiment folders."""
 
 from enum import StrEnum
-from typing import Self
+from typing import Literal, Self
 
 from pydantic import Field, model_validator
 
@@ -16,6 +16,7 @@ class EncoderName(StrEnum):
 class AudioModelConfig(ConfigModel):
     encoder: EncoderName = EncoderName.EFFICIENTNET
     encoder_path: ProjectPath | None = None
+    encoder_device: Literal["cpu", "cuda"] = "cpu"
     # None selects a linear head; an integer adds one hidden layer.
     hidden_dim: int | None = Field(default=None, ge=1)
     pretrained: bool = True

@@ -53,7 +53,8 @@ so changing the configured string does not change implementation branches.
 The [ONNX backbone model card](https://huggingface.co/biodiversica/Perch-onnx-backbone)
 specifies raw mono 32 kHz, five-second audio and an `embedding` output. Its frontend
 is included. Existing audio reading handles downmixing and resampling; Log-Mel
-preprocessing is used only for EfficientNet. ONNX Runtime uses CPU with four threads.
+preprocessing is used only for EfficientNet. ONNX Runtime defaults to CPU with four threads. Set `encoder_device="cuda"`
+for GPU extraction with `onnxruntime-gpu`; exported inference still uses CPU.
 Fixed and dynamic ONNX batch dimensions are supported.
 
 Focal recordings use one deterministic centered crop, with right-padding for
@@ -66,7 +67,7 @@ Set `BCLEF_DATA__CACHE_DIR` or `config.data.cache_dir`:
 | Environment | Default | Reuse |
 | --- | --- | --- |
 | Local | `data/cache` | Normal folder |
-| Colab | `/content/drive/MyDrive/data/cache` | Mount Drive first |
+| Colab | `/content/drive/Shareddrives/BirdCLEF2026/data/cache` | Mount Drive first |
 | Kaggle | `/kaggle/working/cache` | Attach a complete cache Dataset and point to `/kaggle/input/<dataset>/cache` |
 
 Each window is one float32 `.npy` entry under
@@ -97,3 +98,7 @@ of run. Rebuild the wheelhouse to include the new `perch` extra before offline u
 
 The notebook includes an uncached CPU minute check. Measure full inference in the
 Kaggle environment before treating a local timing as a submission budget estimate.
+
+For GPU caching and the first MLP on Colab, use
+[the Colab notebook](../../../../../notebooks/colab/starter.ipynb). It stages audio
+and cache on local VM storage and saves archives to the Shared Drive.

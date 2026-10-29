@@ -2,6 +2,7 @@
 
 from hashlib import file_digest
 from pathlib import Path
+from typing import Literal
 
 import numpy as np
 import torch
@@ -15,10 +16,13 @@ def file_sha256(path: Path) -> str:
 
 
 class PerchEncoder:
-    def __init__(self, path: Path, *, threads: int = 4) -> None:
+    def __init__(
+        self, path: Path, *, threads: int = 4, device: Literal["cpu", "cuda"] = "cpu"
+    ) -> None:
         self.path = path
         self.sha256 = file_sha256(path)
         self.threads = threads
+        self.device = device
         self._session = None
 
     def _load(self):
@@ -27,9 +31,16 @@ class PerchEncoder:
         options = ort.SessionOptions()
         options.intra_op_num_threads = self.threads
         options.inter_op_num_threads = 1
-        session = ort.InferenceSession(
-            str(self.path), sess_options=options, providers=["CPUExecutionProvider"]
-        )
+        providers: list[str | tuple[str, dict[str, str]]] = ["CPUExecutionProvider"]
+        if self.device == "cuda":
+            if "CUDAExecutionProvider" not in ort.get_available_providers():
+                raise RuntimeError("CUDA extraction requires onnxruntime-gpu and an NVIDIA GPU.")
+            ort.preload_dlls()
+            # Avoid expensive cuDNN exhaustive searches when starting a short extraction run.
+            providers.insert(0, ("CUDAExecutionProvider", {"cudnn_conv_algo_search": "HEURISTIC"}))
+        session = ort.InferenceSession(str(self.path), sess_options=options, providers=providers)
+        if self.device == "cuda" and "CUDAExecutionProvider" not in session.get_providers():
+            raise RuntimeError("Perch CUDA provider failed to load; check CUDA/cuDNN installation.")
         inputs = session.get_inputs()
         if (
             len(inputs) != 1

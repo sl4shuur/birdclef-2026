@@ -178,6 +178,11 @@ def test_cached_mlp_trains_resumes_and_exports_portable_offline_predictions(
     model.fit(train, valid, context)
     assert json.loads((run / "fit.json").read_text())["trained_epochs"] == 2
     expected = model.predict(valid)
+    # A GPU extraction setting must not require CUDA in the exported CPU submission.
+    saved_path = run / "model-config.json"
+    saved = json.loads(saved_path.read_text(encoding="utf-8"))
+    saved["model"]["encoder_device"] = "cuda"
+    saved_path.write_text(json.dumps(saved), encoding="utf-8")
     archive = tmp_path / "export.zip"
     exported = CliRunner().invoke(
         export_models, ["--run", str(run), "--all", "--output", str(archive)]
@@ -204,3 +209,11 @@ def test_perch_rejects_unfreezing_and_missing_weights_path():
         AudioModelConfig(
             encoder=EncoderName.PERCH, encoder_path=Path("perch.onnx"), unfreeze_epoch=0
         )
+
+
+def test_cuda_request_fails_before_silently_using_cpu(encoder_path, monkeypatch):
+    import onnxruntime as ort
+
+    monkeypatch.setattr(ort, "get_available_providers", lambda: ["CPUExecutionProvider"])
+    with pytest.raises(RuntimeError, match="onnxruntime-gpu"):
+        PerchEncoder(encoder_path, device="cuda")(torch.zeros(1, 160000))
