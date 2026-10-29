@@ -21,7 +21,7 @@ from birdclef.models.classifier.network import AudioClassifierModule, classifica
 from birdclef.models.config import AudioExperimentConfig
 from birdclef.models.encoders.config import EncoderName
 from birdclef.models.encoders.efficientnet import EfficientNetEncoder
-from birdclef.models.encoders.perch import PerchEncoder
+from birdclef.models.encoders.perch import PerchEncoder, file_sha256
 from birdclef.models.trainer import check_fit_inputs
 from birdclef.processing import log_mel
 
@@ -84,10 +84,20 @@ class EfficientNetBackend(ClassifierBackend):
     transform = staticmethod(log_mel)
     random_crop = True
 
+    def training_data(
+        self, train: pd.DataFrame, valid: pd.DataFrame, context: RunContext
+    ) -> tuple[MixedSourceDataset, Dataset]:
+        if self.config.model.encoder_weights is not None:
+            self.fingerprint = file_sha256(self.config.model.encoder_weights)
+        return super().training_data(train, valid, context)
+
     def network_encoder(self, *, initialize_pretrained: bool) -> EfficientNetEncoder:
+        weights = self.config.model.encoder_weights if initialize_pretrained else None
         encoder = EfficientNetEncoder(
-            pretrained=self.config.model.pretrained and initialize_pretrained
+            pretrained=self.config.model.pretrained and initialize_pretrained and weights is None
         )
+        if weights is not None:
+            encoder.load_state_dict(torch.load(weights, map_location="cpu", weights_only=True))
         self.output_dim = encoder.output_dim
         return encoder
 

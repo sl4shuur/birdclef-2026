@@ -5,7 +5,7 @@ from typing import Self
 
 from pydantic import Field, model_validator
 
-from birdclef.config import Config
+from birdclef.config import Config, ProjectPath
 from birdclef.models.encoders.config import EncoderConfig, EncoderName
 
 
@@ -15,6 +15,8 @@ class ModelType(StrEnum):
 
 
 class AudioModelConfig(EncoderConfig):
+    # Initialization only; inference restores the full classifier checkpoint.
+    encoder_weights: ProjectPath | None = None
     # None selects a linear head; an integer adds one hidden layer.
     hidden_dim: int | None = Field(default=None, ge=1)
     dropout: float = Field(default=0.2, ge=0, lt=1)
@@ -29,6 +31,8 @@ class AudioModelConfig(EncoderConfig):
     @model_validator(mode="after")
     def validate_encoder(self) -> Self:
         if self.encoder == EncoderName.PERCH:
+            if self.encoder_weights is not None:
+                raise ValueError("encoder_weights is only supported by EfficientNet.")
             if self.encoder_path is None:
                 raise ValueError("Perch requires model.encoder_path pointing to a local ONNX file.")
             if self.unfreeze_epoch is not None:
