@@ -12,8 +12,8 @@ from torch.utils.data import DataLoader
 from birdclef.competition import ROW_ID
 from birdclef.config import LRSchedulerConfig
 from birdclef.eval import score
-from birdclef.models.classifier.config import AudioModelConfig
 from birdclef.models.common import BirdClefModule, TrainingBatch
+from birdclef.models.config import AudioModelConfig
 
 
 def classification_head(
@@ -121,7 +121,13 @@ class AudioClassifierModule(BirdClefModule):
             assert isinstance(gathered, torch.Tensor)
             values = gathered.transpose(0, 1).flatten(0, 1)[: len(loader.dataset)]
 
-        targets, probabilities = values.cpu().numpy().transpose(1, 0, 2)
+        # Window models have (N, 2, C); recurrent models retain (N, 2, T, C)
+        # until distributed sequence padding is removed above.
+        targets, probabilities = values.cpu().unbind(dim=1)
+        targets = targets.reshape(-1, len(self.classes))
+        probabilities = probabilities.reshape(-1, len(self.classes))
+        labeled = torch.isfinite(targets).all(dim=1)
+        targets, probabilities = targets[labeled].numpy(), probabilities[labeled].numpy()
         solution = pd.DataFrame(targets, columns=self.classes)
         submission = pd.DataFrame(probabilities, columns=self.classes)
 

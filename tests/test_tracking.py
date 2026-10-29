@@ -76,7 +76,7 @@ def test_audio_fit_cli_uses_wandb_and_saves_secret_free_artifacts(tmp_path, monk
     from lightning.pytorch.utilities import rank_zero_only
 
     from birdclef.models import AudioClassifier, AudioExperimentConfig
-    from birdclef.models.classifier.fit import fit
+    from birdclef.models.fit import fit
 
     tracker = Mock()
     monkeypatch.setattr(rank_zero_only, "rank", rank)

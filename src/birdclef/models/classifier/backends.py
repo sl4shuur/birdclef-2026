@@ -17,8 +17,8 @@ from birdclef.data.embeddings import embeddings
 from birdclef.data.features import feature_tensor
 from birdclef.data.sampling import MixedSourceDataset
 from birdclef.experiment import RunContext
-from birdclef.models.classifier.config import AudioExperimentConfig
 from birdclef.models.classifier.network import AudioClassifierModule, classification_head
+from birdclef.models.config import AudioExperimentConfig
 from birdclef.models.encoders.config import EncoderName
 from birdclef.models.encoders.efficientnet import EfficientNetEncoder
 from birdclef.models.encoders.perch import PerchEncoder
@@ -105,12 +105,22 @@ class PerchBackend(ClassifierBackend):
         self.fingerprint = self.encoder.sha256
         self.cache_dir = self.config.data.cache_dir / "perch-center-v1" / self.encoder.sha256
         training, validation = super().training_data(train, valid, context)
+        training, validation = self._training_features(train, valid, training, validation)
+        self._save_encoder(context.output_dir)
+        return training, validation
+
+    def _training_features(
+        self,
+        train: pd.DataFrame,
+        valid: pd.DataFrame,
+        training: MixedSourceDataset,
+        validation: Dataset,
+    ) -> tuple[MixedSourceDataset, Dataset]:
         datasets = {
             source: self._cached_dataset(train.loc[train.source.eq(source)], dataset)
             for source, dataset in training.by_source.items()
         }
         validation = self._cached_dataset(valid, validation)
-        self._save_encoder(context.output_dir)
         return MixedSourceDataset(datasets), validation
 
     def restore(self, output_dir: Path) -> None:

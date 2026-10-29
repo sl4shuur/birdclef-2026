@@ -7,8 +7,7 @@ from pathlib import Path
 
 import rich_click as click
 
-from birdclef.cli_common import CONTEXT_SETTINGS, load_config
-from birdclef.models import AudioExperimentConfig
+from birdclef.cli_common import CONTEXT_SETTINGS
 
 
 @click.command(context_settings=CONTEXT_SETTINGS)
@@ -28,7 +27,12 @@ from birdclef.models import AudioExperimentConfig
 )
 def fit(config_path: Path, name: str, prepared_dir: Path | None) -> None:
     """Train/resume using fixed folds and W&B."""
-    config = load_config(config_path, AudioExperimentConfig)
+    from birdclef.models.runs import model_class, read_model_config
+
+    try:
+        config = read_model_config(config_path)
+    except (OSError, ValueError) as error:
+        raise click.ClickException(str(error)) from error
     if sys.platform == "win32":
         os.environ.setdefault("USE_LIBUV", "0")
         os.environ.setdefault("MASTER_ADDR", "127.0.0.1")
@@ -40,14 +44,14 @@ def fit(config_path: Path, name: str, prepared_dir: Path | None) -> None:
     from birdclef.data import load_audio_split
     from birdclef.experiment import RunContext
     from birdclef.loggers import CustomLogger, apply_logging_config, wandb_run
-    from birdclef.models import AudioClassifier, read_fit_state
+    from birdclef.models import read_fit_state
 
     apply_logging_config(config.logging)
     logger = CustomLogger("audio-classifier", config=config.logging)
     try:
         prepared_dir = prepared_dir or config.data.output_dir / "data_prep"
         classes = json.loads((prepared_dir / "classes.json").read_text(encoding="utf-8"))
-        model = AudioClassifier(config, classes=classes)
+        model = model_class(config.model_type)(config, classes=classes)
         run_name = config.run_name(name)
         output_dir = config.data.output_dir / run_name
         train, valid = load_audio_split(
@@ -57,13 +61,7 @@ def fit(config_path: Path, name: str, prepared_dir: Path | None) -> None:
             classes=classes,
         )
         if config.smoke:
-            train = pd.concat(
-                [
-                    part.sample(n=min(32, len(part)), random_state=config.train.seed)
-                    for _, part in train.groupby("source", sort=False)
-                ],
-                ignore_index=True,
-            )
+            train = model.smoke_training_data(train)
         protocol = f"file-gkf5/fold-{config.fold}" + ("/smoke" if config.smoke else "")
         logger.info(
             f"Run: {run_name}; training examples: {len(train)}; validation windows: {len(valid)}"

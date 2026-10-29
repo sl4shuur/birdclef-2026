@@ -3,8 +3,9 @@
 from importlib import import_module
 from typing import TYPE_CHECKING
 
-from .classifier.config import AudioExperimentConfig, AudioModelConfig
+from .config import AudioExperimentConfig, AudioModelConfig, ModelType
 from .encoders.config import EncoderConfig, EncoderName
+from .recurrent.config import RecurrentExperimentConfig, RecurrentModelConfig
 
 if TYPE_CHECKING:
     from .checkpoints import FitState, read_fit_state, save_fit_state, training_callbacks
@@ -14,11 +15,18 @@ if TYPE_CHECKING:
     from .common import BirdClefModule, TrainingBatch
     from .encoders.efficientnet import EfficientNetEncoder
     from .encoders.perch import PerchEncoder
+    from .recurrent.model import RecurrentClassifier
+    from .recurrent.network import RecurrentClassifierModule
     from .trainer import check_fit_inputs, fit_module, predict_module
 
 __all__ = [
     "AudioExperimentConfig",
     "AudioModelConfig",
+    "ModelType",
+    "RecurrentExperimentConfig",
+    "RecurrentModelConfig",
+    "RecurrentClassifier",
+    "RecurrentClassifierModule",
     "EncoderName",
     "EncoderConfig",
     "EfficientNetEncoder",
@@ -38,6 +46,8 @@ __all__ = [
 ]
 
 _MODULES = {
+    "RecurrentClassifier": "recurrent.model",
+    "RecurrentClassifierModule": "recurrent.network",
     "EfficientNetEncoder": "encoders.efficientnet",
     "PerchEncoder": "encoders.perch",
     "AudioClassifier": "classifier.model",

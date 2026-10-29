@@ -130,7 +130,10 @@ def test_ddp_workers_require_an_indexed_cache_before_extraction(
 
 
 @pytest.mark.slow
-def test_script_ddp_prepares_cache_once_before_workers(tmp_path, encoder_path, audio_frames):
+@pytest.mark.parametrize("recurrent", [False, True])
+def test_script_ddp_prepares_cache_once_before_workers(
+    tmp_path, encoder_path, audio_frames, recurrent
+):
     import os
     import subprocess
     import sys
@@ -140,7 +143,13 @@ def test_script_ddp_prepares_cache_once_before_workers(tmp_path, encoder_path, a
     valid.to_csv(tmp_path / "valid.csv", index=False)
     worker = Path(__file__).with_name("ddp_perch_worker.py")
     result = subprocess.run(
-        [sys.executable, str(worker), str(tmp_path), str(encoder_path)],
+        [
+            sys.executable,
+            str(worker),
+            str(tmp_path),
+            str(encoder_path),
+            *(["recurrent"] if recurrent else []),
+        ],
         env={**os.environ, "OMP_NUM_THREADS": "1", "MKL_NUM_THREADS": "1"},
         capture_output=True,
         text=True,
@@ -149,9 +158,8 @@ def test_script_ddp_prepares_cache_once_before_workers(tmp_path, encoder_path, a
         timeout=180,
     )
     assert result.returncode == 0, result.stdout + result.stderr
-    assert sum(map(int, (tmp_path / "extracted.txt").read_text().splitlines())) == len(train) + len(
-        valid
-    )
+    expected = 25 if recurrent else len(train) + len(valid)
+    assert sum(map(int, (tmp_path / "extracted.txt").read_text().splitlines())) == expected
     assert json.loads((tmp_path / "run/validation-metrics.json").read_text())["windows"] == len(
         valid
     )
@@ -159,6 +167,17 @@ def test_script_ddp_prepares_cache_once_before_workers(tmp_path, encoder_path, a
         "trained-rank-0",
         "trained-rank-1",
     }
+    metrics = json.loads((tmp_path / "run/validation-metrics.json").read_text())
+    state = json.loads((tmp_path / "run/fit.json").read_text())
+    checkpoint = torch.load(
+        tmp_path / "run" / state["best_checkpoint"], map_location="cpu", weights_only=False
+    )
+    best = next(
+        value["best_model_score"].item()
+        for key, value in checkpoint["callbacks"].items()
+        if "val/auc" in key and value.get("best_model_score") is not None
+    )
+    assert abs(best - metrics["auc"]) < 1e-6
 
 
 @pytest.mark.slow
