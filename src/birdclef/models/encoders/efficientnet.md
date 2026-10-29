@@ -9,7 +9,7 @@ Local `%run` shows progress in the notebook. Use one device there. For DDP, run
 the CLI as a separate process. See [remote setup](../../../../docs/remote.md).
 
 ```bash
-python -m birdclef.models.classifier.fit --config <config.json> --name <run/name>
+python -m birdclef.models.fit --config <config.json> --name <run/name>
 ```
 
 `--prepared-dir` changes the default `data.output_dir/data_prep` folder.

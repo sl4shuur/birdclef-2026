@@ -30,52 +30,6 @@ from birdclef.submission import predict_runs  # noqa: E402
 from birdclef.submission.export import main as export_models  # noqa: E402
 
 
-@pytest.fixture
-def encoder_path(tmp_path):
-    """Tiny real ONNX graph: two features, to catch hardcoded Perch dimensions."""
-    helper = onnx.helper
-    graph = helper.make_graph(
-        [
-            helper.make_node("ReduceMean", ["inputs", "axes"], ["mean"], keepdims=1),
-            helper.make_node("Neg", ["mean"], ["negative"]),
-            helper.make_node("Concat", ["mean", "negative"], ["embedding"], axis=1),
-        ],
-        "test-encoder",
-        [helper.make_tensor_value_info("inputs", onnx.TensorProto.FLOAT, ["batch", 160000])],
-        [helper.make_tensor_value_info("embedding", onnx.TensorProto.FLOAT, ["batch", 2])],
-        [helper.make_tensor("axes", onnx.TensorProto.INT64, [1], [1])],
-    )
-    model = helper.make_model(graph, opset_imports=[helper.make_opsetid("", 18)])
-    model.ir_version = 10
-    path = tmp_path / "test.onnx"
-    onnx.save(model, path)
-    return path
-
-
-@pytest.fixture
-def audio_frames(tmp_path):
-    frames = []
-    for name, source in [("focal", "focal"), ("train", "soundscape"), ("valid", "soundscape")]:
-        path = tmp_path / f"{name}.wav"
-        sf.write(path, np.repeat(np.array([0.1, -0.2], dtype=np.float32), 5 * 32000), 32000)
-        frames.append(
-            pd.DataFrame(
-                {
-                    "filename": [path.name] * 2,
-                    "path": [str(path)] * 2,
-                    "source": [source] * 2,
-                    "start": [0, 5],
-                    "end": [5, 10],
-                    "row_id": [f"{name}_5", f"{name}_10"],
-                    "a": [1, 0],
-                    "b": [0, 1],
-                }
-            )
-        )
-    focal, train, valid = frames
-    return pd.concat([focal.iloc[:1], train], ignore_index=True), valid
-
-
 @pytest.mark.parametrize("fixed_batch", [None, 1, 2])
 def test_encoder_respects_export_batch_size_including_the_last_partial_batch(
     encoder_path, fixed_batch
@@ -176,7 +130,10 @@ def test_ddp_workers_require_an_indexed_cache_before_extraction(
 
 
 @pytest.mark.slow
-def test_script_ddp_prepares_cache_once_before_workers(tmp_path, encoder_path, audio_frames):
+@pytest.mark.parametrize("recurrent", [False, True])
+def test_script_ddp_prepares_cache_once_before_workers(
+    tmp_path, encoder_path, audio_frames, recurrent
+):
     import os
     import subprocess
     import sys
@@ -186,7 +143,13 @@ def test_script_ddp_prepares_cache_once_before_workers(tmp_path, encoder_path, a
     valid.to_csv(tmp_path / "valid.csv", index=False)
     worker = Path(__file__).with_name("ddp_perch_worker.py")
     result = subprocess.run(
-        [sys.executable, str(worker), str(tmp_path), str(encoder_path)],
+        [
+            sys.executable,
+            str(worker),
+            str(tmp_path),
+            str(encoder_path),
+            *(["recurrent"] if recurrent else []),
+        ],
         env={**os.environ, "OMP_NUM_THREADS": "1", "MKL_NUM_THREADS": "1"},
         capture_output=True,
         text=True,
@@ -195,9 +158,8 @@ def test_script_ddp_prepares_cache_once_before_workers(tmp_path, encoder_path, a
         timeout=180,
     )
     assert result.returncode == 0, result.stdout + result.stderr
-    assert sum(map(int, (tmp_path / "extracted.txt").read_text().splitlines())) == len(train) + len(
-        valid
-    )
+    expected = 25 if recurrent else len(train) + len(valid)
+    assert sum(map(int, (tmp_path / "extracted.txt").read_text().splitlines())) == expected
     assert json.loads((tmp_path / "run/validation-metrics.json").read_text())["windows"] == len(
         valid
     )
@@ -205,6 +167,17 @@ def test_script_ddp_prepares_cache_once_before_workers(tmp_path, encoder_path, a
         "trained-rank-0",
         "trained-rank-1",
     }
+    metrics = json.loads((tmp_path / "run/validation-metrics.json").read_text())
+    state = json.loads((tmp_path / "run/fit.json").read_text())
+    checkpoint = torch.load(
+        tmp_path / "run" / state["best_checkpoint"], map_location="cpu", weights_only=False
+    )
+    best = next(
+        value["best_model_score"].item()
+        for key, value in checkpoint["callbacks"].items()
+        if "val/auc" in key and value.get("best_model_score") is not None
+    )
+    assert abs(best - metrics["auc"]) < 1e-6
 
 
 @pytest.mark.slow

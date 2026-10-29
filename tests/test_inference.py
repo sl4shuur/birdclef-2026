@@ -14,7 +14,10 @@ from birdclef.submission.export import main as export_models
 
 def test_ensemble_aligns_rows_and_classes_and_overrides_training_hardware(monkeypatch):
     pytest.importorskip("lightning")
-    from birdclef.models import AudioClassifier
+    from birdclef.models import AudioClassifier, runs
+    from birdclef.models.config import AudioExperimentConfig
+
+    monkeypatch.setattr(runs, "read_model_config", lambda path: AudioExperimentConfig())
 
     frames = {
         "a": pd.DataFrame({"row_id": ["x_5", "x_10"], "a": [0.2, 0.4], "b": [0.8, 0.6]}),

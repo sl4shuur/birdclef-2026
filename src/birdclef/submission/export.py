@@ -47,8 +47,9 @@ def _discover_runs(roots: tuple[Path, ...]) -> dict[Path, Path]:
 )
 def main(runs: tuple[Path, ...], select_all: bool, output: Path) -> None:
     """Find saved models, select them with checkboxes, and pack an inference ZIP."""
-    from birdclef.models import AudioExperimentConfig, read_fit_state
+    from birdclef.models import read_fit_state
     from birdclef.models.classifier.backends import backend_class
+    from birdclef.models.runs import read_model_config
 
     if output.suffix != ".zip":
         raise click.ClickException("Output must be a .zip file.")
@@ -84,9 +85,7 @@ def main(runs: tuple[Path, ...], select_all: bool, output: Path) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             for run in selected:
-                config = AudioExperimentConfig.model_validate_json(
-                    (run / "model-config.json").read_text(encoding="utf-8")
-                )
+                config = read_model_config(run / "model-config.json")
                 checkpoint = found[run]
                 relative = checkpoint.relative_to(run)
                 click.echo(f"Exporting {run.name}: {relative}")

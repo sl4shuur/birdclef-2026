@@ -18,8 +18,8 @@ from birdclef.config import LoaderConfig, LRSchedulerConfig, RuntimeConfig  # no
 from birdclef.data.audio import read_audio_window  # noqa: E402
 from birdclef.data.prepared import audio_training_datasets, load_audio_split  # noqa: E402
 from birdclef.models.classifier.backends import EfficientNetBackend  # noqa: E402
-from birdclef.models.classifier.config import AudioExperimentConfig, AudioModelConfig  # noqa: E402
 from birdclef.models.classifier.model import AudioClassifier  # noqa: E402
+from birdclef.models.config import AudioExperimentConfig, AudioModelConfig  # noqa: E402
 from birdclef.models.encoders import efficientnet as network  # noqa: E402
 from birdclef.processing.audio import log_mel  # noqa: E402
 

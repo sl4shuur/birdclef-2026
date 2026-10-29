@@ -24,9 +24,9 @@ The project supports **local and Kaggle** training and inference. Colab bundle t
 
 - [x] Explore pretrained audio models, including Perch.
 - [ ] Implement knowledge distillation from a pretrained teacher into a smaller student model.
-- [ ] Introduce recurrent layers (e.g., GRU/LSTM) for temporal modeling.
-- [ ] Experiment with other improvements, such as augmentations, sampling strategies, and pseudo-labeling.
-- [ ] Evaluate improvements and submit the best solution.
+- [x] Introduce recurrent layers (GRU/LSTM) for temporal modeling.
+- [x] Experiment with other improvements: regularization, learning rates, and soundscape sampling.
+- [x] Evaluate improvements locally and submit selected candidates to Kaggle.
 
 ### 3. Final Deliverables
 
@@ -103,6 +103,11 @@ For **frozen Perch v2 + MLP**, open
 extra. Embeddings are cached in `data.cache_dir` (`BCLEF_DATA__CACHE_DIR`), which can
 also point to a complete cache attached as a Kaggle Dataset. See
 [Perch settings and cache](src/birdclef/models/encoders/perch.md) for the workflow.
+
+For **frozen Perch + BiGRU**, open [perch_recurrent.ipynb](notebooks/local/perch_recurrent.ipynb).
+It reuses the cache, completes missing recording context and masks unannotated windows.
+See [recurrent training](src/birdclef/models/recurrent/README.md) for sequence sampling
+and GRU/LSTM settings. Both model families use `python -m birdclef.models.fit`.
 
 ## Submit on Kaggle
 

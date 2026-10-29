@@ -1,11 +1,17 @@
 """Audio classification settings and human-named experiment folders."""
 
+from enum import StrEnum
 from typing import Self
 
 from pydantic import Field, model_validator
 
 from birdclef.config import Config
 from birdclef.models.encoders.config import EncoderConfig, EncoderName
+
+
+class ModelType(StrEnum):
+    CLASSIFIER = "classifier"
+    RECURRENT = "recurrent"
 
 
 class AudioModelConfig(EncoderConfig):
@@ -33,6 +39,7 @@ class AudioModelConfig(EncoderConfig):
 
 
 class AudioExperimentConfig(Config):
+    model_type: ModelType = ModelType.CLASSIFIER
     model: AudioModelConfig = Field(default_factory=AudioModelConfig)
     fold: int = Field(default=0, ge=0)
     smoke: bool = False

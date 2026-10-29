@@ -12,21 +12,22 @@ from lightning.pytorch.loggers import CSVLogger
 from birdclef.config import DataConfig, LoaderConfig, RuntimeConfig, TrainConfig
 from birdclef.experiment import RunContext
 from birdclef.models import (
-    AudioClassifier,
     AudioClassifierModule,
     AudioExperimentConfig,
     AudioModelConfig,
+    RecurrentExperimentConfig,
+    RecurrentModelConfig,
 )
-from birdclef.models.classifier import backends
+from birdclef.models.config import ModelType
 from birdclef.models.encoders.config import EncoderName
 from birdclef.models.encoders.perch import PerchEncoder
+from birdclef.models.runs import model_class
 
 ROOT = Path(sys.argv[1]).resolve()
 
 
-class AuditedModule(AudioClassifierModule):
-    def on_train_epoch_end(self) -> None:
-        (ROOT / f"trained-rank-{self.global_rank}").touch()
+def mark_epoch(self: AudioClassifierModule) -> None:
+    (ROOT / f"trained-rank-{self.global_rank}").touch()
 
 
 def main() -> None:
@@ -43,7 +44,7 @@ def main() -> None:
         return original(self, waveforms)
 
     PerchEncoder.__call__ = extract
-    backends.AudioClassifierModule = AuditedModule
+    AudioClassifierModule.on_train_epoch_end = mark_epoch
     config = AudioExperimentConfig(
         data=DataConfig(cache_dir=ROOT / "cache"),
         model=AudioModelConfig(
@@ -54,9 +55,17 @@ def main() -> None:
         ),
         runtime=RuntimeConfig(accelerator="cpu", devices=2, precision="32-true"),
         loader=LoaderConfig(batch_size=2, val_batch_size=1, predict_batch_size=2),
-        train=TrainConfig(max_epochs=1, log_every_n_steps=1),
+        train=TrainConfig(
+            max_epochs=1, log_every_n_steps=1, checkpoint_metric="val/auc", checkpoint_mode="max"
+        ),
     )
-    model = AudioClassifier(config, classes=["a", "b"])
+    if len(sys.argv) > 3:
+        config = RecurrentExperimentConfig(
+            **config.model_dump(exclude={"model", "model_type"}),
+            model=RecurrentModelConfig(encoder_path=Path(sys.argv[2]), recurrent_dim=3),
+            model_type=ModelType.RECURRENT,
+        )
+    model = model_class(config.model_type)(config, classes=["a", "b"])
     context = RunContext(ROOT / "run", CSVLogger(ROOT, name="logs"), Mock(), "test-fold")
     model.fit(pd.read_csv(ROOT / "train.csv"), pd.read_csv(ROOT / "valid.csv"), context)
 

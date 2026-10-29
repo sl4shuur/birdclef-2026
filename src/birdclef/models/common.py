@@ -9,7 +9,7 @@ from lightning.pytorch.utilities.types import OptimizerLRScheduler
 
 from birdclef.config import LRSchedulerConfig
 
-type TrainingBatch = tuple[torch.Tensor, torch.Tensor]
+type TrainingBatch = tuple[torch.Tensor, ...]
 
 
 class BirdClefModule(L.LightningModule, ABC):

@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-from typing import Self
+from typing import ClassVar, Self
 
 import lightning as L
 import pandas as pd
@@ -27,10 +27,14 @@ from birdclef.models import (
 )
 from birdclef.models.classifier.backends import ClassifierBackend, backend_class
 from birdclef.models.classifier.network import AudioClassifierModule
+from birdclef.models.config import ModelType
 from birdclef.submission import validate_row_ids
 
 
 class AudioClassifier(BirdClefModel):
+    model_type: ClassVar[ModelType] = ModelType.CLASSIFIER
+    config_class: ClassVar[type[AudioExperimentConfig]] = AudioExperimentConfig
+
     def __init__(
         self,
         config: AudioExperimentConfig,
@@ -39,6 +43,8 @@ class AudioClassifier(BirdClefModel):
         backend: ClassifierBackend | None = None,
     ) -> None:
         self.config = config
+        if config.model_type != self.model_type:
+            raise ValueError("Configuration model_type differs from the selected model class.")
         self.classes = class_columns(pd.DataFrame(columns=[ROW_ID, *classes]))
         self._module: AudioClassifierModule | None = None
         self._best: Path | None = None
@@ -51,7 +57,7 @@ class AudioClassifier(BirdClefModel):
 
     @classmethod
     def from_run(cls, output_dir: Path, *, config: AudioExperimentConfig | None = None) -> Self:
-        saved = AudioExperimentConfig.model_validate_json(
+        saved = cls.config_class.model_validate_json(
             (output_dir / "model-config.json").read_text(encoding="utf-8")
         )
         classes = json.loads((output_dir / "classes.json").read_text(encoding="utf-8"))
@@ -65,6 +71,15 @@ class AudioClassifier(BirdClefModel):
         model._module = model.backend.module(initialize_pretrained=False)
         model._best = read_fit_state(output_dir).inference_path(output_dir)
         return model
+
+    def smoke_training_data(self, train: pd.DataFrame) -> pd.DataFrame:
+        return pd.concat(
+            [
+                part.sample(n=min(32, len(part)), random_state=self.config.train.seed)
+                for _, part in train.groupby("source", sort=False)
+            ],
+            ignore_index=True,
+        )
 
     def fit(self, train: pd.DataFrame, valid: pd.DataFrame, context: RunContext) -> None:
         config = self.config
@@ -135,6 +150,10 @@ class AudioClassifier(BirdClefModel):
         predictions = predict_module(
             self._module, loader, runtime=self.config.runtime, best=self._best
         )
+        predictions = self._prediction_scores(frame, predictions)
         result = pd.DataFrame(predictions.float().numpy(), columns=classes)
         result.insert(0, ROW_ID, frame[ROW_ID].to_numpy())
         return result
+
+    def _prediction_scores(self, frame: pd.DataFrame, predictions: torch.Tensor) -> torch.Tensor:
+        return predictions
