@@ -104,9 +104,7 @@ def test_cache_reuses_readonly_entries_after_relocation_and_extracts_only_misses
     expected = embeddings(
         frame, InferenceSoundscapeDataset(frame), encoder, loader=loader, cache_dir=cache
     )
-    moved = tmp_path / "moved.wav"
-    shutil.copyfile(frame.path.iloc[0], moved)
-    relocated = frame.iloc[::-1].assign(path=str(moved), fold=99, a=0, b=1)
+    relocated = frame.iloc[::-1].assign(path=str(tmp_path / "missing.wav"), fold=99, a=0, b=1)
 
     class NoAudioReads(Dataset):
         def __len__(self):
