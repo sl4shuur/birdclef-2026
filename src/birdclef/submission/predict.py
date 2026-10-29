@@ -73,7 +73,7 @@ def run_inference(
     sample = pd.read_csv(competition_dir / "sample_submission.csv")
     classes = class_columns(sample)
     directory = soundscapes if soundscapes is not None else competition_dir / "test_soundscapes"
-    preview = soundscapes is None and directory.is_dir() and not any(directory.glob("*.ogg"))
+    preview = soundscapes is None and not any(directory.glob("*.ogg"))
     if preview:
         print("No visible test audio: checking one training minute before submission.", flush=True)
         directory = competition_dir / "train_soundscapes"
