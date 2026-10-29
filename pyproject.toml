@@ -21,6 +21,7 @@ notebooks = ["ipykernel>=6", "ipywidgets>=8", "nbformat>=5", "matplotlib>=3.9"]
 audio = ["soundfile>=0.13", "librosa>=0.11", "scipy>=1.14"]
 
 deep-learning = ["torch>=2.11", "torchvision>=0.26", "lightning>=2.6", "wandb>=0.31.0"]
+perch = ["onnxruntime>=1.23"]
 
 [build-system]
 requires = ["hatchling"]
@@ -49,6 +50,7 @@ explicit = true
 
 [dependency-groups]
 dev = [
+    "onnx>=1.19",
     "pytest>=8",
     "ruff>=0.8",
     "build>=1.2",
