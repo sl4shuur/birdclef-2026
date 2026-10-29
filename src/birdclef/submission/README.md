@@ -10,11 +10,13 @@ Choose CPU and Internet OFF. Installation uses `--no-index`.
 Set `RUN_DIRS` to the model paths printed in the notebook. One run uses one model.
 Several runs average probabilities after aligning IDs and classes.
 `WEIGHTS=None` gives equal weights; otherwise give one positive weight per run.
-Loading supports this project's EfficientNet and frozen Perch runs, including mixed
+Loading supports this project's EfficientNet, Perch MLP and recurrent Perch runs, including mixed
 ensembles. Perch exports include `encoder.onnx` and `encoder.json`; rebuild the
 wheelhouse to include ONNX Runtime before offline inference.
 Inference uses one CPU device, FP32, saved processing and class order. It starts no
 W&B run and downloads no weights.
+Recurrent models use all 12 windows of each requested recording as context and
+return predictions for the requested windows. Rebuild the wheelhouse after these code changes.
 
 ## Checkpoints and export
 

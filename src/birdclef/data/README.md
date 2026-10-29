@@ -63,3 +63,7 @@ Datasets handle loading and targets; models handle learned steps and predictions
 cache. The caller chooses its complete namespace. It stores vectors and sample
 identities, without labels, folds or model construction. A complete indexed cache
 works without source audio and without writes; `cache_dir=None` extracts directly.
+
+`sequences.py` builds full recording context and explicit annotation masks for
+recurrent models. Focal clips have length 1; soundscapes have 12 ordered windows.
+Unlabeled windows are context only. See [recurrent models](../models/recurrent/README.md).

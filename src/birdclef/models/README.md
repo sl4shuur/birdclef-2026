@@ -7,6 +7,9 @@ and checkpoint state.
 [encoders/](encoders/README.md) contains reusable feature extractors and their
 settings. Encoders know nothing about classes, targets or experiment lifecycles.
 
-[classifier/](classifier/README.md) implements one-window classification:
-configuration, encoder integration, heads, training and inference.
+[classifier/](classifier/README.md) implements one-window classification and the
+shared fit/reporting lifecycle. [recurrent/](recurrent/README.md) adds sequence
+assembly and masked recurrent training, using the same encoders and lifecycle.
+Common model settings live in `config.py`; `runs.py` selects the model family
+for the shared `python -m birdclef.models.fit` CLI, export and inference.
 Public imports come from `birdclef.models`; optional ML dependencies load lazily.
