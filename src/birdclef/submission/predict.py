@@ -27,7 +27,7 @@ def predict_runs(
     uses one CPU, FP32, no tracker and no pretrained-weight downloads.
     """
     from birdclef.config import LoaderConfig, RuntimeConfig
-    from birdclef.models import AudioCNN
+    from birdclef.models import AudioClassifier
 
     if not runs:
         raise ValueError("Select at least one model run.")
@@ -44,7 +44,7 @@ def predict_runs(
     predictions = []
     for run in runs:
         print(f"Model: {run}", flush=True)
-        model = AudioCNN.from_run(run)
+        model = AudioClassifier.from_run(run)
         model.config.runtime = RuntimeConfig(accelerator="cpu", devices=1, precision="32-true")
         model.config.loader = loader
         prediction = build_submission(model.predict(windows), template)
