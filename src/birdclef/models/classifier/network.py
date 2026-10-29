@@ -1,7 +1,7 @@
 """An encoder, a classification head and shared full-fold validation."""
 
 from collections.abc import Sized
-from typing import Any
+from typing import Any, Self
 
 import numpy as np
 import pandas as pd
@@ -47,12 +47,45 @@ class AudioClassifierModule(BirdClefModule):
         )
         self.encoder = encoder
         self.head = head
+        self.config = config
+        blocks = list(self.encoder.children())
+        if config.unfreeze_last_n is not None and config.unfreeze_last_n > len(blocks):
+            raise ValueError(f"unfreeze_last_n exceeds the encoder's {len(blocks)} blocks.")
+        self._set_encoder_trainability()
         self.classes = classes.copy()
         self.save_hyperparameters({"classes": self.classes}, logger=False)
         self._validation: list[tuple[torch.Tensor, torch.Tensor]] = []
 
     def forward(self, inputs: torch.Tensor) -> torch.Tensor:
         return self.head(self.encoder(inputs))
+
+    def _set_encoder_trainability(self) -> None:
+        epoch = self.config.unfreeze_epoch
+        unfrozen = epoch is not None and self.current_epoch >= epoch
+        blocks = list(self.encoder.children())
+        first = len(blocks) - (self.config.unfreeze_last_n or len(blocks))
+        self.encoder.requires_grad_(unfrozen)
+        self.encoder.train(self.training and unfrozen)
+        for index, block in enumerate(blocks):
+            trainable = unfrozen and index >= first
+            block.requires_grad_(trainable)
+            # Frozen blocks keep BatchNorm statistics and stochastic depth fixed.
+            block.train(self.training and trainable)
+
+    def train(self, mode: bool = True) -> Self:
+        super().train(mode)
+        self._set_encoder_trainability()
+        return self
+
+    def on_train_epoch_start(self) -> None:
+        self._set_encoder_trainability()
+
+    def optimizer_groups(self) -> list[dict[str, Any]]:
+        # Register frozen parameters too, preserving optimizer/scheduler state on unfreeze.
+        return [
+            {"params": self.encoder.parameters(), "lr": self.config.encoder_lr, "name": "encoder"},
+            {"params": self.head.parameters(), "lr": self.config.head_lr, "name": "head"},
+        ]
 
     def on_load_checkpoint(self, checkpoint: dict[str, Any]) -> None:
         if checkpoint["hyper_parameters"]["classes"] != self.classes:

@@ -1,13 +1,13 @@
 # Frozen Perch + MLP
 
-Start with [perch_mlp.ipynb](../../../../../notebooks/local/perch_mlp.ipynb).
+Start with [perch_mlp.ipynb](../../../../notebooks/local/perch_mlp.ipynb).
 It uses the existing training CLI, prepared folds, source sampler, BCE, AdamW,
 schedulers, AUC, early stopping, checkpoints, resume and W&B reports.
 Distillation and recurrent layers are separate future experiments.
 
 ```bash
 uv sync --extra notebooks --extra deep-learning --extra audio --extra perch
-uv run python -m birdclef.models.classifier.perch.download
+uv run python -m birdclef.models.encoders.download
 ```
 
 The download command saves a pinned, checksum-verified ONNX backbone to
@@ -31,22 +31,20 @@ the embeddings; output size follows `classes.json`. Neither 1536 nor 234 is
 hardcoded in the head. EfficientNet also supports `hidden_dim`, and its current
 linear head and fine-tuning behavior remain the defaults.
 
-`AudioClassifierModule` accepts an encoder and a head. `AudioCNNModule` adds
-EfficientNet preprocessing and gradual/partial unfreezing. Frozen Perch runs
+`AudioClassifierModule` accepts an encoder and a head, and owns gradual/partial
+unfreezing. `EfficientNetEncoder` owns normalization and pooling. Frozen Perch runs
 outside PyTorch and its head receives cached vectors through an identity encoder.
 `AudioClassifier` owns the shared training and inference lifecycle. It delegates
-encoder-specific work to `ClassifierEncoder`: `training_data`, `module`,
-`prediction_data` and `restore`. `FrozenPerchEncoder` owns the cache, feature size
-and ONNX artifacts; `EfficientNetEncoder` owns Log-Mel inputs and the CNN module.
+integration work to classifier backends: datasets, PyTorch modules and saved state.
+`PerchBackend` owns cache selection, feature size and ONNX artifacts;
+`EfficientNetBackend` selects Log-Mel inputs and constructs the trainable encoder.
 The classifier, training CLI and exporter contain no checks for encoder names.
 
-To add an encoder, subclass `ClassifierEncoder`, add an `EncoderName` enum member,
-and map it to your class in `models/classifier/encoders.py`. The base already provides audio
-datasets and resume checks. Override data preparation for cached features, and
-set `artifacts` if the encoder needs external files. For a Python-only experiment,
-you can pass an encoder instance directly with `AudioClassifier(..., encoder=...)`;
-register it when you need saved-run loading. Display names live in `EncoderName`,
-so changing the configured string does not change implementation branches.
+Encoders live independently in `models/encoders/`. Extend classifier integration
+through `models/classifier/backends.py`; see the [classifier README](../classifier/README.md).
+Shared feature extraction and caching live in `data/embeddings.py` and accept a
+callable plus the cache namespace chosen by the backend. The cache has no Perch,
+head, class or experiment dependencies.
 
 ## Audio and cache
 
@@ -106,5 +104,5 @@ The notebook includes an uncached CPU minute check. Measure full inference in th
 Kaggle environment before treating a local timing as a submission budget estimate.
 
 For GPU caching and the first MLP on Colab, use
-[the Colab notebook](../../../../../notebooks/colab/starter.ipynb). It stages audio
+[the Colab notebook](../../../../notebooks/colab/starter.ipynb). It stages audio
 and cache on local VM storage and saves archives to the Shared Drive.

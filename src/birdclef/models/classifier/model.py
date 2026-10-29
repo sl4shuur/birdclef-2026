@@ -25,8 +25,7 @@ from birdclef.models import (
     predict_module,
     read_fit_state,
 )
-from birdclef.models.classifier.encoder import ClassifierEncoder
-from birdclef.models.classifier.encoders import encoder_class
+from birdclef.models.classifier.backends import ClassifierBackend, backend_class
 from birdclef.models.classifier.network import AudioClassifierModule
 from birdclef.submission import validate_row_ids
 
@@ -37,17 +36,17 @@ class AudioClassifier(BirdClefModel):
         config: AudioExperimentConfig,
         *,
         classes: list[str],
-        encoder: ClassifierEncoder | None = None,
+        backend: ClassifierBackend | None = None,
     ) -> None:
         self.config = config
         self.classes = class_columns(pd.DataFrame(columns=[ROW_ID, *classes]))
         self._module: AudioClassifierModule | None = None
         self._best: Path | None = None
         self.sampler: SourceWeightedRandomSampler | None = None
-        self.encoder = (
-            encoder
-            if encoder is not None
-            else encoder_class(config.model.encoder)(config, self.classes)
+        self.backend = (
+            backend
+            if backend is not None
+            else backend_class(config.model.encoder)(config, self.classes)
         )
 
     @classmethod
@@ -62,8 +61,8 @@ class AudioClassifier(BirdClefModel):
             saved.runtime = config.runtime
             saved.loader = config.loader
         model = cls(saved, classes=classes)
-        model.encoder.restore(output_dir)
-        model._module = model.encoder.module(initialize_pretrained=False)
+        model.backend.restore(output_dir)
+        model._module = model.backend.module(initialize_pretrained=False)
         model._best = read_fit_state(output_dir).inference_path(output_dir)
         return model
 
@@ -73,7 +72,7 @@ class AudioClassifier(BirdClefModel):
         validate_row_ids(valid)
         L.seed_everything(config.train.seed, workers=True)
         score(valid[[ROW_ID, *classes]], valid[[ROW_ID, *classes]])
-        training, validation = self.encoder.training_data(train, valid, context)
+        training, validation = self.backend.training_data(train, valid, context)
         if rank_zero_only.rank == 0:
             (context.output_dir / "classes.json").write_text(
                 json.dumps(classes, indent=2), encoding="utf-8"
@@ -81,7 +80,7 @@ class AudioClassifier(BirdClefModel):
         data = self._training_loader(training, validation)
         context.tracker.log_hyperparams({**config.safe_dump(), "num_classes": len(classes)})
         continuing = (context.output_dir / "checkpoints" / "last.ckpt").is_file()
-        self._module = self.encoder.module(initialize_pretrained=not continuing)
+        self._module = self.backend.module(initialize_pretrained=not continuing)
         self._best = fit_module(
             self._module,
             data,
@@ -131,7 +130,7 @@ class AudioClassifier(BirdClefModel):
             return pd.DataFrame(columns=[ROW_ID, *classes])
         validate_row_ids(frame)
         loader = prediction_dataloader(
-            self.encoder.prediction_data(frame), config=self.config.loader
+            self.backend.prediction_data(frame), config=self.config.loader
         )
         predictions = predict_module(
             self._module, loader, runtime=self.config.runtime, best=self._best

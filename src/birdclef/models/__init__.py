@@ -3,25 +3,29 @@
 from importlib import import_module
 from typing import TYPE_CHECKING
 
-from .classifier.config import AudioExperimentConfig, AudioModelConfig, EncoderName
+from .classifier.config import AudioExperimentConfig, AudioModelConfig
+from .encoders.config import EncoderConfig, EncoderName
 
 if TYPE_CHECKING:
     from .checkpoints import FitState, read_fit_state, save_fit_state, training_callbacks
-    from .classifier.audio_cnn.network import AudioCNNModule
-    from .classifier.encoder import ClassifierEncoder
+    from .classifier.backends import ClassifierBackend
     from .classifier.model import AudioClassifier
     from .classifier.network import AudioClassifierModule
     from .common import BirdClefModule, TrainingBatch
+    from .encoders.efficientnet import EfficientNetEncoder
+    from .encoders.perch import PerchEncoder
     from .trainer import check_fit_inputs, fit_module, predict_module
 
 __all__ = [
     "AudioExperimentConfig",
     "AudioModelConfig",
     "EncoderName",
-    "AudioCNNModule",
+    "EncoderConfig",
+    "EfficientNetEncoder",
+    "PerchEncoder",
     "AudioClassifier",
     "AudioClassifierModule",
-    "ClassifierEncoder",
+    "ClassifierBackend",
     "FitState",
     "read_fit_state",
     "save_fit_state",
@@ -34,10 +38,11 @@ __all__ = [
 ]
 
 _MODULES = {
-    "AudioCNNModule": "classifier.audio_cnn.network",
+    "EfficientNetEncoder": "encoders.efficientnet",
+    "PerchEncoder": "encoders.perch",
     "AudioClassifier": "classifier.model",
     "AudioClassifierModule": "classifier.network",
-    "ClassifierEncoder": "classifier.encoder",
+    "ClassifierBackend": "classifier.backends",
     "FitState": "checkpoints",
     "read_fit_state": "checkpoints",
     "save_fit_state": "checkpoints",

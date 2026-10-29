@@ -93,7 +93,7 @@ def fit(config_path: Path, name: str, prepared_dir: Path | None) -> None:
                 output_dir / "validation-class-metrics.csv",
                 output_dir / "validation-metrics.json",
             ]
-            files.extend(output_dir / name for name in model.encoder.artifacts)
+            files.extend(output_dir / name for name in model.backend.artifacts)
             for path in files:
                 artifact.add_file(str(path), name=path.relative_to(output_dir).as_posix())
             tracker.experiment.log_artifact(artifact, aliases=["best"])

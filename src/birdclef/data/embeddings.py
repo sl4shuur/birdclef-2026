@@ -3,6 +3,7 @@
 import json
 import os
 import tempfile
+from collections.abc import Callable
 from hashlib import sha256
 from pathlib import Path
 
@@ -14,7 +15,6 @@ from torch.utils.data import Dataset, Subset
 
 from birdclef.config import LoaderConfig
 from birdclef.data.datamodule import prediction_dataloader
-from birdclef.models.classifier.perch.encoder import PerchEncoder
 
 
 def _sample_identity(row: dict) -> list:
@@ -74,7 +74,7 @@ def _save(path: Path, embedding: torch.Tensor) -> None:
 def embeddings(
     frame: pd.DataFrame,
     dataset: Dataset,
-    encoder: PerchEncoder,
+    encoder: Callable[[torch.Tensor], torch.Tensor],
     *,
     loader: LoaderConfig,
     cache_dir: Path | None = None,
@@ -83,21 +83,31 @@ def embeddings(
 
     A complete cache works on a read-only Kaggle Dataset. With cache_dir=None,
     inference extracts directly without trying to write into a training cache.
-    Bump the namespace if decoding, resampling or crop policy changes.
+    cache_dir is the complete namespace chosen by the caller. Bump it if decoding,
+    resampling or crop policy changes. Targets and model construction stay outside.
     """
+    if len(frame) == 0:
+        raise ValueError("Embedding extraction requires at least one sample.")
     paths = []
     if cache_dir is not None:
-        directory = cache_dir / "perch-center-v1" / encoder.sha256
-        paths = _cache_paths(frame, directory)
+        paths = _cache_paths(frame, cache_dir)
     missing = [index for index in range(len(frame)) if not paths or not paths[index].is_file()]
     if missing and paths:
         paths[0].parent.mkdir(parents=True, exist_ok=True)
     values: dict[int, torch.Tensor] = {}
     batches = prediction_dataloader(Subset(dataset, missing), config=loader)
     offset = 0
-    for batch in track(batches, description=f"Perch: {len(missing)} uncached windows"):
+    for batch in track(batches, description=f"Embeddings: {len(missing)} uncached windows"):
         inputs = batch[0] if isinstance(batch, (tuple, list)) else batch
-        for embedding in encoder(inputs):
+        features = encoder(inputs).detach().cpu()
+        if (
+            features.ndim != 2
+            or features.shape[0] != len(inputs)
+            or features.shape[1] == 0
+            or not torch.isfinite(features).all()
+        ):
+            raise ValueError("Encoder must return one finite feature vector per sample.")
+        for embedding in features:
             index = missing[offset]
             if paths:
                 _save(paths[index], embedding)

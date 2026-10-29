@@ -1,4 +1,4 @@
-"""Frozen Perch ONNX encoder. Its frontend consumes raw mono 32 kHz waveforms."""
+"""Frozen Perch ONNX encoder: mono 32 kHz waveforms to feature vectors."""
 
 from hashlib import file_digest
 from pathlib import Path

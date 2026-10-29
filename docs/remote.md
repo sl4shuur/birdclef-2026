@@ -24,7 +24,7 @@ the project bundle on Kaggle/Colab. Rebuild bundles to include ONNX Runtime.
 Point `PREPARED_DIR` at the bundle's `data_prep`, and `ENCODER_PATH` at a downloaded
 or attached Perch ONNX file. `CACHE_DIR` can be a writable working/Drive folder or
 a complete read-only cache Dataset. Preserve the `perch-center-v1` directory when
-uploading a cache. See [cache details](../src/birdclef/models/classifier/perch/README.md).
+uploading a cache. See [cache details](../src/birdclef/models/encoders/perch.md).
 Perch extraction uses CPU by default; `model.encoder_device="cuda"` enables CUDA
 with `onnxruntime-gpu`. Existing Kaggle
 inference accepts the exported run, which includes the encoder weights.

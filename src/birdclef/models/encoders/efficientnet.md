@@ -6,7 +6,7 @@ Set `RUN_NAME` and the settings in the code cell. `SMOKE_RUN=True` runs one shor
 epoch with full-fold validation. Use a new folder for full training.
 
 Local `%run` shows progress in the notebook. Use one device there. For DDP, run
-the CLI as a separate process. See [remote setup](../../../../../docs/remote.md).
+the CLI as a separate process. See [remote setup](../../../../docs/remote.md).
 
 ```bash
 python -m birdclef.models.classifier.fit --config <config.json> --name <run/name>
@@ -21,7 +21,7 @@ Offline logs can be uploaded later with `wandb sync`.
 
 The current model uses a mono EfficientNet-B0 and a dropout/linear head.
 Set `model.encoder=EncoderName.PERCH` for frozen Perch embeddings with the same training
-lifecycle; see [Perch + MLP](../perch/README.md). `AudioClassifier` is the shared
+lifecycle; see [Perch + MLP](perch.md). `AudioClassifier` is the shared
 entry point for both encoders.
 Log-Mel inputs have shape `(B, 1, 128, 497)`. Each input is standardized by its
 own mean and standard deviation (minimum 1e-6). The RGB stem uses mean RGB weights.
@@ -86,4 +86,4 @@ Saved local scores are one-fold scores, not pooled OOF scores.
 `AudioClassifier.from_run` loads the saved config and classes. It uses the best checkpoint
 from `fit.json`, or `checkpoints/last.ckpt` if no best is recorded. Class order is
 checked against the checkpoint. `predict` keeps input row IDs and needs no targets.
-See [submission](../../../submission/README.md) for export and offline inference.
+See [submission](../../submission/README.md) for export and offline inference.

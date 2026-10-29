@@ -8,7 +8,7 @@ import rich_click as click
 
 from birdclef.cli_common import CONTEXT_SETTINGS
 from birdclef.config import get_config
-from birdclef.models.classifier.perch.encoder import file_sha256
+from birdclef.models.encoders.perch import file_sha256
 
 REVISION = "7fb3a9838cd7c9577d69c461947c71e5e6687030"
 SHA256 = "97a0f6c20e7892594c4811156b51d5a27172af44c54fde158e892ede6893b83c"
