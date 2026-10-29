@@ -96,7 +96,13 @@ uv run pytest
 Run the same name to continue training. Use a new name when you change the data, fold or training settings. Saved configs do not include API keys.
 
 For Kaggle or Colab, see [remote setup](docs/remote.md).
-For model settings and saved files, see [training details](src/birdclef/models/audio_cnn/README.md).
+For model layout and training commands, see [training details](src/birdclef/models/README.md).
+
+For **frozen Perch v2 + MLP**, open
+[perch_mlp.ipynb](notebooks/local/perch_mlp.ipynb) and install the additional `perch`
+extra. Embeddings are cached in `data.cache_dir` (`BCLEF_DATA__CACHE_DIR`), which can
+also point to a complete cache attached as a Kaggle Dataset. See
+[Perch settings and cache](src/birdclef/models/classifier/perch/README.md) for the workflow.
 
 ## Submit on Kaggle
 
