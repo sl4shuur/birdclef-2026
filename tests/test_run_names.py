@@ -15,7 +15,23 @@ def test_run_name_keeps_the_experiment_path_and_separates_smoke_checks():
 
 
 @pytest.mark.parametrize(
-    "name", ["", "../run", r"..\run", "a:b", ".", "run.", "/run", "a//b", "a/../b", "run/"]
+    "name",
+    [
+        "",
+        "..",
+        "../run",
+        r"..\run",
+        "a:b",
+        ".",
+        "run.",
+        "/run",
+        "a//b",
+        "a/../b",
+        "run/",
+        " run",
+        "run/ name",
+        "run\t",
+    ],
 )
 def test_rejects_invalid_experiment_paths(name):
     with pytest.raises(ValueError, match="Run name"):

@@ -25,8 +25,10 @@ class AudioExperimentConfig(Config):
     def run_name(self, name: str) -> str:
         """Keep the supplied relative path; smoke checks live in their own subfolder."""
         if any(
-            not part.strip()
-            or part.endswith((" ", "."))
+            not part
+            or part in {".", ".."}
+            or part != part.strip()
+            or part.endswith(".")
             or any(character in part for character in '<>:"\\|?*')
             for part in name.split("/")
         ):

@@ -146,6 +146,7 @@ def check_fit_inputs(
     context: RunContext,
 ) -> None:
     """Shared resume guard: only epoch budget and checkpoint count may change."""
+    # TODO: Include the preprocessing settings/code version in the resume signature.
     output_dir = context.output_dir
     settings = config.safe_dump()
     settings = {key: settings[key] for key in ("model", "loader", "lr_scheduler", "train")}
