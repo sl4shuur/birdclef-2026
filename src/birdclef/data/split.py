@@ -42,7 +42,9 @@ def group_holdout(
         list(dict.fromkeys([group_column, ROW_ID])) if ROW_ID in frame else [group_column]
     )
     identity = frame[identity_columns]
-    checksum = sha256(pd.util.hash_pandas_object(identity, index=True).values.tobytes()).hexdigest()
+    checksum = sha256(
+        pd.util.hash_pandas_object(identity, index=True).to_numpy().tobytes()
+    ).hexdigest()
     return DataSplit(
         train=train,
         val=valid,

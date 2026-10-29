@@ -1,23 +1,28 @@
 """Lightning training/resume and single-device inference, shared between models."""
 
+import hashlib
+import json
 import time
 from pathlib import Path
 
 import lightning as L
+import pandas as pd
 import torch
+from lightning.pytorch.callbacks import LearningRateMonitor, TQDMProgressBar
 from lightning.pytorch.strategies import DDPStrategy
+from lightning.pytorch.utilities import rank_zero_only
 from torch.nn.parallel import DistributedDataParallel
 from torch.utils.data import DataLoader
 
-from birdclef.config import LoaderConfig, RuntimeConfig, TrainConfig
-from birdclef.experiment.contract import RunContext
-from birdclef.models.checkpoints import (
+from birdclef.config import Config, LoaderConfig, RuntimeConfig, TrainConfig
+from birdclef.experiment import RunContext
+from birdclef.models import (
     FitState,
     read_fit_state,
     save_fit_state,
     training_callbacks,
 )
-from birdclef.runtime.hardware import resolve_runtime
+from birdclef.runtime import resolve_runtime
 
 
 class _CurrentStreamDDPStrategy(DDPStrategy):
@@ -27,9 +32,20 @@ class _CurrentStreamDDPStrategy(DDPStrategy):
     """
 
     def _setup_model(self, model: torch.nn.Module) -> DistributedDataParallel:
-        return DistributedDataParallel(
-            module=model, device_ids=self.determine_ddp_device_ids(), **self._ddp_kwargs
-        )
+        # Register frozen parameters too: they may be unfrozen after DDP is constructed.
+        parameters = list(model.parameters())
+        trainable = [parameter.requires_grad for parameter in parameters]
+        model.requires_grad_(True)
+        try:
+            return DistributedDataParallel(
+                module=model,
+                device_ids=self.determine_ddp_device_ids(),
+                find_unused_parameters=not all(trainable),
+                **self._ddp_kwargs,
+            )
+        finally:
+            for parameter, enabled in zip(parameters, trainable, strict=True):
+                parameter.requires_grad_(enabled)
 
 
 def fit_module(
@@ -65,8 +81,14 @@ def fit_module(
         accumulate_grad_batches=train_config.accumulate_grad_batches,
         gradient_clip_val=train_config.gradient_clip_val,
         log_every_n_steps=train_config.log_every_n_steps,
+        benchmark=resolved.accelerator != "cpu",
+        num_sanity_val_steps=0,
         logger=run.tracker,
-        callbacks=list(callbacks),
+        callbacks=[
+            *callbacks,
+            LearningRateMonitor(logging_interval="epoch"),
+            TQDMProgressBar(leave=False),
+        ],
     )
     run.tracker.log_hyperparams(
         {
@@ -103,8 +125,57 @@ def predict_module(
         **resolve_runtime(runtime).model_copy(update={"devices": 1}).model_dump(),
         logger=False,
         enable_checkpointing=False,
+        callbacks=[TQDMProgressBar(leave=False)],
     )
     batches = trainer.predict(module, loader, ckpt_path=best, weights_only=False)
     if not batches:
         raise ValueError("Prediction requires at least one batch.")
-    return torch.cat([batch.detach().cpu() for batch in batches])
+    tensors: list[torch.Tensor] = []
+    for batch in batches:
+        if not isinstance(batch, torch.Tensor):
+            raise TypeError("Single-loader prediction must return tensor batches.")
+        tensors.append(batch.detach().cpu())
+    return torch.cat(tensors)
+
+
+def check_fit_inputs(
+    config: Config,
+    train: pd.DataFrame,
+    valid: pd.DataFrame,
+    columns: list[str],
+    context: RunContext,
+) -> None:
+    """Shared resume guard: only epoch budget and checkpoint count may change."""
+    # TODO: Include the preprocessing settings/code version in the resume signature.
+    output_dir = context.output_dir
+    settings = config.safe_dump()
+    settings = {key: settings[key] for key in ("model", "loader", "lr_scheduler", "train")}
+    for key in ("max_epochs", "checkpoint_top_k"):
+        settings["train"].pop(key)
+    checksums = [
+        hashlib.sha256(
+            pd.util.hash_pandas_object(frame[columns], index=True).to_numpy().tobytes()
+        ).hexdigest()
+        for frame in (train, valid)
+    ]
+    signature = {
+        "settings": settings,
+        "columns": columns,
+        "data": checksums,
+        "protocol": context.protocol,
+    }
+    path = output_dir / "fit-inputs.json"
+    if path.exists():
+        previous = json.loads(path.read_text(encoding="utf-8"))
+        if previous != signature:
+            raise ValueError("Data or model settings changed; choose a new run directory.")
+    elif (output_dir / "checkpoints").exists() or (output_dir / "fit.json").exists():
+        raise ValueError("Existing checkpoints require fit-inputs.json to resume safely.")
+    if getattr(rank_zero_only, "rank", 0) == 0:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_suffix(".json.tmp")
+        temporary.write_text(json.dumps(signature, indent=2), encoding="utf-8")
+        temporary.replace(path)
+        (output_dir / "model-config.json").write_text(
+            json.dumps(config.safe_dump(), indent=2), encoding="utf-8"
+        )

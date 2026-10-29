@@ -1,59 +1,58 @@
 # Data
 
-`labels.encode_labels` owns species validation and focal multi-hot encoding in
-sample-submission class order. Primary and optional secondary labels are weak
-clip annotations, even when a training crop contains no target vocalization.
+## Prepare files
 
-`manifests.focal_manifest` validates source paths and returns clip metadata and
-aligned targets. `manifests.soundscape_manifest` returns only explicitly labeled,
-aligned five-second windows and their targets. Duplicate annotation sets collapse;
-conflicting sets, empty labels, unknown species and invalid intervals fail. Missing
-windows are never negatives. Neither helper changes source files.
+Run `notebooks/local/data_prep.ipynb`. It writes metadata, targets, class order,
+fixed folds, support reports and SHA-256 hashes to `outputs/data_prep`.
+Audio stays in its source folder. CSV paths are rebuilt from the chosen data root.
+Hashes cover source tables and prepared files, not audio content.
+Version-2 target CSVs need identity keys; rebuild older files without keys.
 
-`audio.FocalAudioDataset` reads random training crops using torch RNG, centered
-evaluation crops, and right-pads short clips. `audio.SoundscapeDataset` reads
-exact annotated windows and rejects truncated audio. Both downmix, resample to
-32 kHz and return `(inputs, binary_targets)`. Inputs are five-second waveforms,
-or the result of an optional sample transform such as `processing.audio.log_mel`.
-Targets must have a named, unique identity index: `filename` for focal clips,
-`row_id` for soundscape windows. Read CSVs with `index_col` set to that key.
-Datasets explicitly align by key and reject missing, extra or duplicate IDs.
-Construct both sources with the same class order. No peak normalization is applied.
+Class order comes from `sample_submission.csv`, not sorted taxonomy names.
+Focal clips use primary and secondary labels for the whole clip. A short crop
+may not contain the labeled sound. Soundscapes use only annotated 5-second windows.
+Missing annotations are not negative examples.
 
-`audio.read_audio_window` also supports inference without targets. Build its
-window metadata with `birdclef.competition.soundscape_windows`. Keep row IDs
-aligned with predictions; the public sample contains placeholder rows.
+Matching duplicate label sets are merged. Unknown species, bad intervals, empty
+labels and conflicting label sets cause an error. Source files are not changed.
+Focal clips below one second are excluded and listed in `short_recordings_review.csv`.
+A clip of exactly one second is kept. Header read errors stop preparation.
 
-`split.group_folds` creates zero-based, unstratified GroupKFold assignments,
-stable under input row reordering. Save assignments before filtering windows.
-`split.group_holdout` remains available for a single reproducible holdout, with
-a manifest. Neither guarantees rare-class coverage. The preparation notebook
-saves per-class positive/negative validation support: absence of positives skips
-a class in the competition metric; absence of negatives blocks its AUC.
+## Load samples
 
-`notebooks/local/data_prep.ipynb` owns preparation artifact writing: portable CSV
-metadata and targets, ordered `classes.json`, folds, support reports, header
-audit and excluded short-recording review, plus source/artifact SHA-256 hashes. Paths are
-rebuilt from a chosen data root; audio is not copied or content-hashed.
+- `FocalAudioDataset`: random training crops, centered evaluation crops; pad short clips.
+- `SoundscapeDataset`: exact labeled windows; reject short or broken windows.
+- `InferenceSoundscapeDataset`: the same windows without targets.
 
-`features.multilabel_dataset` and `features.FeatureDataset` remain the entry points
-for precomputed numeric features. Datasets own loading, crop/target granularity
-and tensor conversion. Models own learned computation, loss and predictions;
-differentiable transforms may instead live inside a model. The existing numeric
-MLP does not accept waveforms or spectrograms.
+Audio becomes mono at 32 kHz. There is no peak normalization. Each sample is a
+5-second waveform, or the result of an optional transform such as `log_mel`.
+Targets are binary. Use the same class order for all datasets.
 
-`manifests.filter_focal_duration` applies the explicit minimum-duration policy
-(default one second), returns retained metadata/targets and an exclusion report.
-Exactly one second is retained; files are never deleted. The notebook runs the
-header audit before filtering and saves version-2 artifacts with keyed targets.
-Old target CSVs without keys must be regenerated.
+Target CSV indexes must be named `filename` for focal clips or `row_id` for windows.
+Load them with `index_col`. Data is aligned by key; missing, extra or duplicate
+keys cause an error. `soundscape_windows` makes inference IDs from real files.
 
-`sampling.SourceWeightedRandomSampler` expects `ConcatDataset([focal, soundscapes])`.
-It samples with replacement using weights `(1-p)/N_focal` and `p/N_soundscape`.
-`p` is initialized from `loader.soundscape_probability` in the notebook. Update
-with `set_soundscape_probability(p)` between epochs without rebuilding the model
-or loader. Weights affect the next iterator; batches already drawn stay unchanged.
-The fraction is expected, not guaranteed per batch. `num_samples` fixes epoch
-length; no species balancing is implied. Pass the sampler explicitly to
-`TrainingDataModule`. Use ordinary sequential loading for validation. Multi-device
-distributed training requires a separate sampling design.
+## Folds and sampling
+
+`group_folds` uses zero-based GroupKFold by recording. Save folds before filtering.
+`group_holdout` gives one fixed split and a manifest. Neither ensures that rare
+classes appear in every fold. Keep support reports. File groups do not prove
+that sites or sounds are independent.
+
+`load_audio_split` checks saved hashes and class order, rebuilds paths and uses
+saved folds. Training has focal clips and soundscapes; validation has soundscapes
+only. Shared soundscape files between train and validation cause an error.
+
+`SourceWeightedRandomSampler` expects `ConcatDataset([focal, soundscapes])`.
+It samples with replacement: weights are `(1-p)/N_focal` and `p/N_soundscape`.
+`loader.soundscape_probability` sets `p` (default 0.1). This is an expected source
+fraction, not a class balance rule or an exact fraction in every batch.
+`num_samples` sets epoch length. Change `p` between epochs with
+`set_soundscape_probability(p)`. Already drawn or prefetched samples stay the same.
+
+Pass the sampler to `TrainingDataModule`. `set_epoch` uses seed + epoch, also
+after resume. Lightning splits draws across DDP ranks. Validation is not sampled;
+its scores use all unique windows after distributed padding is removed.
+
+For saved numeric features, use `multilabel_dataset` and `FeatureDataset`.
+Datasets handle loading and targets; models handle learned steps and predictions.

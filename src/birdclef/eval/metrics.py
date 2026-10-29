@@ -56,3 +56,17 @@ def score(
             average="macro",
         )
     )
+
+
+def evaluate(solution: pd.DataFrame, submission: pd.DataFrame) -> tuple[float, pd.DataFrame]:
+    """Competition score plus per-species support/AUC, retaining skipped classes."""
+    macro = score(solution, submission)
+    targets = solution.drop(columns=ROW_ID)
+    positive = targets.sum()
+    report = pd.DataFrame({"positive": positive, "negative": len(targets) - positive})
+    report.index.name = "species"
+    report["auc"] = float("nan")
+    active = positive.index[positive.gt(0)].tolist()
+    for label in active:
+        report.loc[label, "auc"] = roc_auc_score(targets[label], submission[label])
+    return macro, report

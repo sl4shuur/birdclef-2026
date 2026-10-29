@@ -14,7 +14,7 @@ The project supports **local, Kaggle, and Google Colab** workflows, with modular
 
 - [x] Perform EDA: class distributions, audio characteristics, labels, sites, and data quality.
 - [x] Explore additional publicly available audio datasets and pretrained models.
-- [ ] Design modular, readable, and scalable training and inference pipelines.
+- [x] Design modular, readable, and scalable training and inference pipelines.
 - [x] Add label encoding, recording-level holdout, competition metric, and submission tools.
 - [x] Implement audio preprocessing and select a baseline validation protocol.
 - [ ] Train a baseline model and implement CPU-compatible inference.
@@ -80,75 +80,43 @@ The project supports **local, Kaggle, and Google Colab** workflows, with modular
 ```bash
 uv run ruff check .
 uv run ruff format --check .
+uv run pyright
 uv run pytest
 ```
 
-## Project Structure
+`pytest` runs fast checks. Use `uv run pytest -m slow` for training, checkpoint, DDP and fresh-process checks. Use `uv run pytest -m ""` to run both groups.
 
-| Directory                  | Purpose                                 |
-| -------------------------- | --------------------------------------- |
-| `src/birdclef/data/`       | Data loading and validation splits      |
-| `src/birdclef/processing/` | Audio preprocessing and transformations |
-| `src/birdclef/models/`     | Model architectures and training        |
-| `src/birdclef/eval/`       | Metrics and evaluation                  |
-| `src/birdclef/submission/` | Inference and submission generation     |
-| `src/birdclef/experiment/` | Experiment orchestration and artifacts  |
-| `src/birdclef/runtime/`    | Runtime and hardware configuration      |
-| `notebooks/`               | Local, Kaggle, and Colab workflows      |
-| `scripts/`                 | Runtime checks and deployment utilities |
+## Prepare and train
 
-Configuration is managed through `src/birdclef/config.py` and `.env`.
+1. Run [data_prep.ipynb](notebooks/local/data_prep.ipynb). It saves files in `outputs/data_prep`.
+2. Train a model. Like here for example: [audio_baseline.ipynb](notebooks/local/audio_baseline.ipynb).
+3. Set a run name and training settings. Use `SMOKE_RUN=True` for a short check.
+4. Results and checkpoints go to `outputs/<run name>`.
 
-`models/baseline/` contains a multilabel MLP for precomputed numeric features: BCE with logits for training, sigmoid probabilities for inference. Audio datasets and an optional Log-Mel frontend are available; an acoustic model remains future work. The generic experiment lifecycle files still contain explicit stubs; working MLP entry points are `birdclef.models.baseline.fit` and `birdclef.models.baseline.predict`.
+Run the same name to continue training. Use a new name when you change the data, fold or training settings. Saved configs do not include API keys.
 
-## Kaggle & Colab
+For Kaggle or Colab, see [remote setup](docs/remote.md).
+For model settings and saved files, see [training details](src/birdclef/models/audio_cnn/README.md).
 
-### Kaggle
+## Submit on Kaggle
 
-For offline package installation, configure Kaggle CLI credentials and your dataset ID in `scripts/kaggle/dataset.py`.
+Open [inference.ipynb](notebooks/kaggle/inference.ipynb).
+Attach competition data, the [wheelhouse](https://www.kaggle.com/datasets/denysmykhailov/birdclef-2026-wheelhouse), and your model Dataset or a training notebook's saved Output.
+Choose **CPU** and **Internet OFF**. Set `RUN_DIRS` and run all cells. One run uses one model; several runs average their scores. `WEIGHTS` is optional.
+
+To upload local models, first make a ZIP:
 
 ```bash
-uv run python -m scripts.kaggle.wheelhouse snapshot
-uv run python -m scripts.kaggle.wheelhouse publish --dry-run
-uv run python -m scripts.kaggle.wheelhouse publish --create
+uv run python -m birdclef.submission.export --run outputs/audio-cnn
 ```
 
-Use `publish -m "Update wheelhouse"` for subsequent updates.
+Choose models with Space, then press Enter. The ZIP is `build/birdclef-models.zip`.
+You can repeat `--run` for more folders. Add `--all` to skip the menu.
+See [submission details](src/birdclef/submission/README.md) for checkpoint rules and test data.
 
-The snapshot command uses Kaggle GPU quota. Attach the published wheelhouse dataset to the Kaggle notebook for offline installation.
+## More information
 
-### Google Colab
-
-```bash
-uv run python -m scripts.colab.wheelhouse build
-```
-
-Upload `build/birdclef-colab.zip` and follow the setup cells in `notebooks/colab/starter.ipynb`.
-
-## Competition Constraints
-
-- **Metric:** Macro ROC-AUC
-- **Prediction:** 234 scores per 5-second audio segment
-- **Inference:** CPU-only submission, 90-minute runtime limit
-- **Internet:** Disabled during submission
-- **External data:** Publicly available data and pretrained models are permitted, subject to competition rules
-
-The competition has concluded; leaderboard submissions depend on Kaggle's post-competition availability.
-
-## Audio data preparation
-
-`FocalAudioDataset` returns random 5-second training crops or centered evaluation crops with weak clip-level targets. `SoundscapeDataset` reads exact annotated windows, never adding unannotated negatives. Both return mono 32 kHz waveforms and binary targets in the supplied class order; an optional `log_mel` transform returns `(1, 128, 497)` tensors. See `src/birdclef/data/README.md` for contracts.
-
-Run `notebooks/local/data_prep.ipynb` using the local starter environment. Paths
-come from the config: `data.competition_dir` (default `data/competition`) and
-`data.output_dir` (artifacts in `outputs/data_prep`). Focal clips shorter than one
-second are excluded with a report; original audio files remain untouched. Target
-CSVs include identity keys (`filename` / `row_id`) and align by key after reload.
-
-The notebook visualizes the audio-to-tensor stages and source sampling.
-`loader.soundscape_probability` is a training hyperparameter: 0.3 means an expected
-30% soundscape windows under `SourceWeightedRandomSampler`, independently of
-source sizes. Call `sampler.set_soundscape_probability(0.3)` between epochs to
-change the mixture with the same loader and model. An active iterator and its
-prefetched batches are unchanged. Pass the sampler to `TrainingDataModule`;
-validation is never oversampled. This is source balancing, not species balancing.
+- [Results](docs/experiments.md)
+- [Competition and metric](docs/competition.md)
+- [Package layout](src/birdclef/README.md)
+- [Data preparation](src/birdclef/data/README.md)

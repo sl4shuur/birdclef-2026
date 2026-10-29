@@ -2,9 +2,9 @@
 
 from functools import lru_cache
 from pathlib import Path
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, ClassVar, Literal
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, SecretStr
+from pydantic import AfterValidator, BaseModel, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from rich.console import Console
 from rich.table import Table
@@ -26,7 +26,7 @@ class ConfigModel(BaseModel):
     """Configuration values share one console presentation."""
 
     # A setting that was renamed or moved must fail loudly instead of being ignored.
-    model_config = ConfigDict(extra="forbid")
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(extra="forbid")
 
     def show(self) -> None:
         table = Table(title=type(self).__name__, header_style="bold cyan", border_style="dim")
@@ -74,7 +74,7 @@ class SplitConfig(ConfigModel):
 
 class TrackingConfig(ConfigModel):
     project: str = "birdclef-2026"
-    entity: str | None = None
+    entity: str | None = "dmykhailov-kyiv-school-of-economics"
     offline: bool = True
     api_key: SecretStr | None = None
 
@@ -91,7 +91,7 @@ class LoaderConfig(ConfigModel):
 
 
 class LRSchedulerConfig(ConfigModel):
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(extra="forbid", frozen=True)
 
     name: Literal["none", "plateau", "cosine"] = "none"
     # Both schedulers advance once per epoch; cosine's horizon stays fixed on resume.
@@ -122,7 +122,7 @@ class RuntimeConfig(ConfigModel):
 
 
 class Config(BaseSettings, ConfigModel):
-    model_config = SettingsConfigDict(
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(
         env_file=PROJECT_ROOT / ".env",
         env_file_encoding="utf-8",
         env_prefix="BCLEF_",

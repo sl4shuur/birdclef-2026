@@ -1,6 +1,6 @@
 import json
 import logging
-from collections.abc import Mapping
+from collections.abc import Mapping, MutableMapping
 from datetime import datetime
 from typing import Any
 
@@ -64,8 +64,8 @@ class EvalLogger(logging.LoggerAdapter):
     def process(
         self,
         msg: Any,
-        kwargs: dict[str, Any],
-    ) -> tuple[Any, dict[str, Any]]:
+        kwargs: MutableMapping[str, Any],
+    ) -> tuple[Any, MutableMapping[str, Any]]:
         extra = dict(self.extra) if self.extra else {}
         record_extra = kwargs.get("extra")
 

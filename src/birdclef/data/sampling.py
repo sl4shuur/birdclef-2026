@@ -27,6 +27,8 @@ class SourceWeightedRandomSampler(WeightedRandomSampler):
             raise ValueError("Both source datasets must be nonempty.")
         self.focal_count = focal_count
         self.soundscape_count = soundscape_count
+        generator = generator or torch.Generator().manual_seed(torch.initial_seed())
+        self._seed = generator.initial_seed()
         size = focal_count + soundscape_count
         super().__init__(
             [1.0] * size,
@@ -35,6 +37,11 @@ class SourceWeightedRandomSampler(WeightedRandomSampler):
             generator=generator,
         )
         self.set_soundscape_probability(soundscape_probability)
+
+    def set_epoch(self, epoch: int) -> None:
+        """Lightning forwards the epoch through its distributed sampler wrapper."""
+        assert self.generator is not None
+        self.generator.manual_seed(self._seed + epoch)
 
     def set_soundscape_probability(self, probability: float) -> None:
         """Call between epochs, including from a training callback if needed."""

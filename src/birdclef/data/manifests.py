@@ -85,8 +85,8 @@ def soundscape_manifest(
     # Keep one implementation of species validation and multi-hot class ordering.
     label_frame = pd.DataFrame(
         {
-            "primary_label": metadata.labels.map(lambda labels: labels[0]),
-            "secondary_labels": metadata.labels.map(lambda labels: list(labels[1:])),
+            "primary_label": [labels[0] for labels in metadata.labels.tolist()],
+            "secondary_labels": [list(labels[1:]) for labels in metadata.labels.tolist()],
         }
     )
     targets = encode_labels(label_frame, classes)
