@@ -55,7 +55,7 @@ def test_ensemble_rejects_invalid_weights_before_loading_models(weights):
         )
 
 
-@pytest.mark.parametrize("hidden", [False, True])
+@pytest.mark.parametrize("hidden", [False, True, None])
 def test_public_preview_checks_real_audio_but_hidden_submission_uses_actual_ids(
     tmp_path, monkeypatch, hidden
 ):
@@ -65,7 +65,8 @@ def test_public_preview_checks_real_audio_but_hidden_submission_uses_actual_ids(
     train = competition / "train_soundscapes"
     test = competition / "test_soundscapes"
     train.mkdir(parents=True)
-    test.mkdir()
+    if hidden is not None:
+        test.mkdir()
     (train / "train.ogg").touch()
     if hidden:
         (test / "test_b.ogg").touch()
