@@ -145,8 +145,12 @@ class PerchBackend(ClassifierBackend):
     def network_encoder(self, *, initialize_pretrained: bool) -> nn.Identity:
         return nn.Identity()
 
-    def prediction_data(self, frame: pd.DataFrame) -> FeatureDataset:
-        return FeatureDataset(self._features(frame, InferenceSoundscapeDataset(frame)))
+    def prediction_data(
+        self, frame: pd.DataFrame, *, features: torch.Tensor | None = None
+    ) -> FeatureDataset:
+        if features is None:
+            features = self._features(frame, InferenceSoundscapeDataset(frame))
+        return FeatureDataset(features)
 
     def _features(
         self, frame: pd.DataFrame, dataset: Dataset, *, cache_only: bool = False

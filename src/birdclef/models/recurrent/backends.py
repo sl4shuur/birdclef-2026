@@ -58,7 +58,10 @@ class RecurrentPerchBackend(PerchBackend):
         targets, mask = window_targets(windows, labeled, self.classes)
         return sequence_dataset(inputs, targets, mask, length=SEQUENCE_LENGTH)
 
-    def prediction_data(self, frame: pd.DataFrame) -> FeatureDataset:
-        windows = recording_windows(frame)
-        inputs = self._features(windows, InferenceSoundscapeDataset(windows))
-        return FeatureDataset(inputs.reshape(-1, SEQUENCE_LENGTH, inputs.shape[-1]))
+    def prediction_data(
+        self, frame: pd.DataFrame, *, features: torch.Tensor | None = None
+    ) -> FeatureDataset:
+        if features is None:
+            windows = recording_windows(frame)
+            features = self._features(windows, InferenceSoundscapeDataset(windows))
+        return FeatureDataset(features.reshape(-1, SEQUENCE_LENGTH, features.shape[-1]))
