@@ -33,7 +33,7 @@ def _cache_path(row: dict, directory: Path) -> Path:
     return directory / f"{key}.npy"
 
 
-def _cache_paths(frame: pd.DataFrame, directory: Path) -> list[Path]:
+def _cache_paths(frame: pd.DataFrame, directory: Path, *, cache_only: bool) -> list[Path]:
     """Resolve saved sample identities without reopening their source audio."""
     index_path = directory / "index.json"
     index = json.loads(index_path.read_text(encoding="utf-8")) if index_path.is_file() else {}
@@ -42,6 +42,10 @@ def _cache_paths(frame: pd.DataFrame, directory: Path) -> list[Path]:
     for row in frame.to_dict("records"):
         key = json.dumps(_sample_identity(row))
         if key not in index:
+            if cache_only:
+                raise ValueError(
+                    "Cache index is incomplete; prepare embeddings in one process before DDP."
+                )
             # Existing .npy names stay intact; only new/unindexed samples need audio metadata.
             index[key] = _cache_path(row, directory).name
             changed = True
@@ -61,7 +65,7 @@ def _cache_paths(frame: pd.DataFrame, directory: Path) -> list[Path]:
 
 
 def _save(path: Path, embedding: torch.Tensor) -> None:
-    # Unique temporary files also make concurrent extraction safe.
+    # Atomic replacement prevents partial arrays; it does not coordinate extraction.
     with tempfile.NamedTemporaryFile(dir=path.parent, delete=False) as stream:
         temporary = Path(stream.name)
         np.save(stream, embedding.numpy(), allow_pickle=False)
@@ -78,6 +82,7 @@ def embeddings(
     *,
     loader: LoaderConfig,
     cache_dir: Path | None = None,
+    cache_only: bool = False,
 ) -> torch.Tensor:
     """Read existing entries, extract only misses and return the original sample order.
 
@@ -85,13 +90,16 @@ def embeddings(
     inference extracts directly without trying to write into a training cache.
     cache_dir is the complete namespace chosen by the caller. Bump it if decoding,
     resampling or crop policy changes. Targets and model construction stay outside.
+    cache_only rejects misses without updating the index or running the extractor.
     """
     if len(frame) == 0:
         raise ValueError("Embedding extraction requires at least one sample.")
     paths = []
     if cache_dir is not None:
-        paths = _cache_paths(frame, cache_dir)
+        paths = _cache_paths(frame, cache_dir, cache_only=cache_only)
     missing = [index for index in range(len(frame)) if not paths or not paths[index].is_file()]
+    if missing and cache_only:
+        raise ValueError("Cache entries are missing; prepare embeddings in one process before DDP.")
     if missing and paths:
         paths[0].parent.mkdir(parents=True, exist_ok=True)
     values: dict[int, torch.Tensor] = {}

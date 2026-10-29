@@ -117,9 +117,15 @@ def test_cache_reuses_readonly_entries_after_relocation_and_extracts_only_misses
     with monkeypatch.context() as patch:
         patch.setattr(fresh, "_load", Mock(side_effect=AssertionError("Cache must skip ONNX.")))
         patch.setattr(Path, "mkdir", Mock(side_effect=AssertionError("Cache is read-only.")))
-        actual = embeddings(relocated, NoAudioReads(), fresh, loader=loader, cache_dir=cache)
+        actual = embeddings(
+            relocated, NoAudioReads(), fresh, loader=loader, cache_dir=cache, cache_only=True
+        )
     torch.testing.assert_close(actual, expected.flip(0))
     next(cache.rglob("*.npy")).unlink()
+    with pytest.raises(ValueError, match="prepare embeddings in one process"):
+        embeddings(
+            relocated, NoAudioReads(), fresh, loader=loader, cache_dir=cache, cache_only=True
+        )
     calls = []
     original = PerchEncoder.__call__
 
@@ -144,6 +150,61 @@ def test_cache_reuses_readonly_entries_after_relocation_and_extracts_only_misses
         cache_dir=cache.parent / file_sha256(encoder_path),
     )
     assert calls == [1, 2]
+
+
+@pytest.mark.parametrize("rank", ["0", "1"])
+def test_ddp_workers_require_an_indexed_cache_before_extraction(
+    tmp_path, encoder_path, audio_frames, monkeypatch, rank
+):
+    from birdclef.models.classifier.backends import PerchBackend
+
+    train, valid = audio_frames
+    config = AudioExperimentConfig(
+        model=AudioModelConfig(
+            encoder=EncoderName.PERCH, encoder_path=encoder_path, unfreeze_epoch=None
+        )
+    )
+    config.data.cache_dir = tmp_path / "cache"
+    context = RunContext(tmp_path / "run", Mock(), Mock(), "test-fold")
+    monkeypatch.setenv("LOCAL_RANK", rank)
+    monkeypatch.setattr(
+        PerchEncoder, "_load", Mock(side_effect=AssertionError("DDP must not extract features."))
+    )
+    with pytest.raises(ValueError, match="prepare embeddings in one process"):
+        PerchBackend(config, ["a", "b"]).training_data(train, valid, context)
+    assert not config.data.cache_dir.exists()
+
+
+@pytest.mark.slow
+def test_script_ddp_prepares_cache_once_before_workers(tmp_path, encoder_path, audio_frames):
+    import os
+    import subprocess
+    import sys
+
+    train, valid = audio_frames
+    train.to_csv(tmp_path / "train.csv", index=False)
+    valid.to_csv(tmp_path / "valid.csv", index=False)
+    worker = Path(__file__).with_name("ddp_perch_worker.py")
+    result = subprocess.run(
+        [sys.executable, str(worker), str(tmp_path), str(encoder_path)],
+        env={**os.environ, "OMP_NUM_THREADS": "1", "MKL_NUM_THREADS": "1"},
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=180,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert sum(map(int, (tmp_path / "extracted.txt").read_text().splitlines())) == len(train) + len(
+        valid
+    )
+    assert json.loads((tmp_path / "run/validation-metrics.json").read_text())["windows"] == len(
+        valid
+    )
+    assert {path.name for path in tmp_path.glob("trained-rank-*")} == {
+        "trained-rank-0",
+        "trained-rank-1",
+    }
 
 
 @pytest.mark.slow

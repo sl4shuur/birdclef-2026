@@ -1,6 +1,7 @@
 """Connect audio or cached features to the single-window classifier lifecycle."""
 
 import json
+import os
 import shutil
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -127,9 +128,16 @@ class PerchBackend(ClassifierBackend):
     def prediction_data(self, frame: pd.DataFrame) -> FeatureDataset:
         return FeatureDataset(self._features(frame, InferenceSoundscapeDataset(frame)))
 
-    def _features(self, frame: pd.DataFrame, dataset: Dataset) -> torch.Tensor:
+    def _features(
+        self, frame: pd.DataFrame, dataset: Dataset, *, cache_only: bool = False
+    ) -> torch.Tensor:
         inputs = embeddings(
-            frame, dataset, self.encoder, loader=self.config.loader, cache_dir=self.cache_dir
+            frame,
+            dataset,
+            self.encoder,
+            loader=self.config.loader,
+            cache_dir=self.cache_dir,
+            cache_only=cache_only,
         )
         if self.output_dim is not None and inputs.shape[1] != self.output_dim:
             raise ValueError("Encoder and cached embedding dimensions differ.")
@@ -137,7 +145,10 @@ class PerchBackend(ClassifierBackend):
         return inputs
 
     def _cached_dataset(self, frame: pd.DataFrame, dataset: Dataset) -> TensorDataset:
-        return TensorDataset(self._features(frame, dataset), feature_tensor(frame, self.classes))
+        # Lightning's parent prepares the cache before launching workers. External
+        # launchers (e.g. torchrun) must receive a complete cache from a prior run.
+        inputs = self._features(frame, dataset, cache_only="LOCAL_RANK" in os.environ)
+        return TensorDataset(inputs, feature_tensor(frame, self.classes))
 
     @rank_zero_only
     def _save_encoder(self, output_dir: Path) -> None:
