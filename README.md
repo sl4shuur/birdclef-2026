@@ -23,7 +23,7 @@ The project supports **local and Kaggle** training and inference. Colab bundle t
 ### 2. Model Improvements
 
 - [x] Explore pretrained audio models, including Perch.
-- [ ] Implement knowledge distillation from a pretrained teacher into a smaller student model.
+- [x] Implement knowledge distillation from a pretrained teacher into a smaller student model.
 - [x] Introduce recurrent layers (GRU/LSTM) for temporal modeling.
 - [x] Experiment with other improvements: regularization, learning rates, and soundscape sampling.
 - [x] Evaluate improvements locally and submit selected candidates to Kaggle.
