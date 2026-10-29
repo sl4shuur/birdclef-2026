@@ -1,4 +1,4 @@
-"""Train the acoustic baseline from the CLI or a notebook's %run."""
+"""Train an audio classifier from the CLI or a notebook's %run."""
 
 import json
 import os
@@ -40,14 +40,14 @@ def fit(config_path: Path, name: str, prepared_dir: Path | None) -> None:
     from birdclef.data import load_audio_split
     from birdclef.experiment import RunContext
     from birdclef.loggers import CustomLogger, apply_logging_config, wandb_run
-    from birdclef.models import AudioCNN, read_fit_state
+    from birdclef.models import AudioClassifier, read_fit_state
 
     apply_logging_config(config.logging)
-    logger = CustomLogger("audio-baseline", config=config.logging)
+    logger = CustomLogger("audio-classifier", config=config.logging)
     try:
         prepared_dir = prepared_dir or config.data.output_dir / "data_prep"
         classes = json.loads((prepared_dir / "classes.json").read_text(encoding="utf-8"))
-        model = AudioCNN(config, classes=classes)
+        model = AudioClassifier(config, classes=classes)
         run_name = config.run_name(name)
         output_dir = config.data.output_dir / run_name
         train, valid = load_audio_split(
@@ -93,6 +93,7 @@ def fit(config_path: Path, name: str, prepared_dir: Path | None) -> None:
                 output_dir / "validation-class-metrics.csv",
                 output_dir / "validation-metrics.json",
             ]
+            files.extend(output_dir / name for name in model.encoder.artifacts)
             for path in files:
                 artifact.add_file(str(path), name=path.relative_to(output_dir).as_posix())
             tracker.experiment.log_artifact(artifact, aliases=["best"])

@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 from birdclef.competition import ROW_ID
 from birdclef.config import LRSchedulerConfig
 from birdclef.eval import score
-from birdclef.models.audio_cnn.config import AudioModelConfig
+from birdclef.models.classifier.config import AudioModelConfig
 from birdclef.models.common import BirdClefModule, TrainingBatch
 
 

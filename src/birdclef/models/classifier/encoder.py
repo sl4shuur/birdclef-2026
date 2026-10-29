@@ -8,8 +8,8 @@ from torch.utils.data import ConcatDataset, Dataset
 
 from birdclef.data import InferenceSoundscapeDataset, audio_training_datasets
 from birdclef.experiment import RunContext
-from birdclef.models.audio_cnn.config import AudioExperimentConfig
-from birdclef.models.classification import AudioClassifierModule
+from birdclef.models.classifier.config import AudioExperimentConfig
+from birdclef.models.classifier.network import AudioClassifierModule
 from birdclef.models.trainer import check_fit_inputs
 
 
