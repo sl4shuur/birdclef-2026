@@ -17,12 +17,12 @@ The project supports **local, Kaggle, and Google Colab** workflows, with modular
 - [x] Design modular, readable, and scalable training and inference pipelines.
 - [x] Add label encoding, recording-level holdout, competition metric, and submission tools.
 - [x] Implement audio preprocessing and select a baseline validation protocol.
-- [ ] Train a baseline model and implement CPU-compatible inference.
-- [ ] Submit the baseline to Kaggle and record the leaderboard score.
+- [x] Train a baseline model and implement CPU-compatible inference.
+- [x] Submit the baseline to Kaggle and record the leaderboard score.
 
 ### 2. Model Improvements
 
-- [ ] Explore pretrained audio models, including Perch.
+- [x] Explore pretrained audio models, including Perch.
 - [ ] Implement knowledge distillation from a pretrained teacher into a smaller student model.
 - [ ] Introduce recurrent layers (e.g., GRU/LSTM) for temporal modeling.
 - [ ] Experiment with other improvements, such as augmentations, sampling strategies, and pseudo-labeling.
@@ -30,7 +30,7 @@ The project supports **local, Kaggle, and Google Colab** workflows, with modular
 
 ### 3. Final Deliverables
 
-- [ ] Reproducible Python training and inference code.
+- [x] Reproducible Python training and inference code.
 - [ ] Screenshots of Kaggle submission results.
 - [ ] Short PDF report covering EDA, methodology, experiments, results, and limitations.
 - [ ] Proposed future improvements with additional time and compute.
@@ -102,7 +102,7 @@ For **frozen Perch v2 + MLP**, open
 [perch_mlp.ipynb](notebooks/local/perch_mlp.ipynb) and install the additional `perch`
 extra. Embeddings are cached in `data.cache_dir` (`BCLEF_DATA__CACHE_DIR`), which can
 also point to a complete cache attached as a Kaggle Dataset. See
-[Perch settings and cache](src/birdclef/models/classifier/perch/README.md) for the workflow.
+[Perch settings and cache](src/birdclef/models/encoders/perch.md) for the workflow.
 
 ## Submit on Kaggle
 
