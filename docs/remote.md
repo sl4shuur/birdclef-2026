@@ -1,5 +1,22 @@
 # Kaggle and Colab
 
+## Saved Perch cache and model
+
+The private [Perch cache Dataset](https://www.kaggle.com/datasets/denysmykhailov/birdclef-2026-perch-cache)
+contains 35,918 verified float32 embeddings. Kaggle exposes the uploaded archive
+under `perch-cache/`; set `data.cache_dir` to that folder, which contains
+`perch-center-v1/`. The cache has no head weights, source audio or labels.
+
+For Colab, upload `build/perch-cache.zip` to
+`/content/drive/Shareddrives/BirdCLEF2026/data/cache/perch-cache.zip`.
+The Colab starter restores that archive into its local cache.
+
+For offline submission, add `build/perch-mlp-model.zip` to the existing models
+Dataset and replace the wheelhouse contents with `build/perch-offline-runtime.zip`.
+Use `notebooks/kaggle/perch_inference.ipynb`, CPU and Internet OFF. Attach the
+competition, models and wheelhouse only; no cache Dataset is needed.
+Model and wheelhouse uploads were left to the user; only the cache was published.
+
 ## Perch embeddings
 
 The [Perch notebook](../notebooks/local/perch_mlp.ipynb) also works after installing
