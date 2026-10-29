@@ -120,7 +120,7 @@ def publish(context: click.Context, message: str | None, dry_run: bool, create: 
         "Creating wheelhouse Dataset..."
         if create
         else "Uploading new wheelhouse Dataset version...",
-        fg="yellow"
+        fg="yellow",
     )
     upload(notes, create=create)
     click.secho("Wheelhouse published.", fg="green")
