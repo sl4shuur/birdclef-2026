@@ -49,6 +49,92 @@ def test_ensemble_aligns_rows_and_classes_and_overrides_training_hardware(monkey
     np.testing.assert_allclose(result[["a", "b"]], [[0.5, 0.5], [0.7, 0.3]])
 
 
+@pytest.mark.parametrize("same_encoder", [True, False])
+def test_perch_ensemble_extracts_once_per_encoder_and_keeps_sequence_context(
+    tmp_path, encoder_path, audio_frames, monkeypatch, same_encoder
+):
+    import shutil
+
+    onnx = pytest.importorskip("onnx")
+    torch = pytest.importorskip("torch")
+    pytest.importorskip("onnxruntime")
+    pytest.importorskip("lightning")
+
+    from birdclef.models import AudioClassifier, RecurrentClassifier, runs
+    from birdclef.models.classifier.backends import PerchBackend
+    from birdclef.models.config import AudioExperimentConfig, AudioModelConfig
+    from birdclef.models.encoders.config import EncoderName
+    from birdclef.models.encoders.perch import PerchEncoder
+    from birdclef.models.recurrent.config import RecurrentExperimentConfig, RecurrentModelConfig
+
+    torch.set_num_threads(2)
+    other_path = tmp_path / "other.onnx"
+    shutil.copyfile(encoder_path, other_path)
+    if not same_encoder:
+        graph = onnx.load(other_path)
+        graph.producer_name = "different encoder"
+        onnx.save(graph, other_path)
+    configs = {
+        "mlp": AudioExperimentConfig(
+            model=AudioModelConfig(
+                encoder=EncoderName.PERCH,
+                encoder_path=encoder_path,
+                unfreeze_epoch=None,
+            )
+        ),
+        "rnn": RecurrentExperimentConfig(
+            model=RecurrentModelConfig(
+                encoder_path=other_path,
+                recurrent_dim=3,
+            )
+        ),
+    }
+    models = {}
+    for name, config in configs.items():
+        model = runs.model_class(config.model_type)(config, classes=["a", "b"])
+        assert isinstance(model.backend, PerchBackend)
+        model.backend.encoder = PerchEncoder(config.model.encoder_path)
+        model.backend.output_dim = 2
+        model.backend.cache_dir = None
+        model._module = model.backend.module(initialize_pretrained=False).eval()
+        model._best = tmp_path / "dummy.ckpt"
+        models[name] = model
+    monkeypatch.setattr(runs, "read_model_config", lambda path: configs[path.parent.name])
+    monkeypatch.setattr(AudioClassifier, "from_run", lambda path: models[path.name])
+    monkeypatch.setattr(RecurrentClassifier, "from_run", lambda path: models[path.name])
+
+    def predict_module(module, loader, **kwargs):
+        with torch.inference_mode():
+            return torch.cat([module(inputs).sigmoid() for inputs in loader])
+
+    monkeypatch.setattr("birdclef.models.classifier.model.predict_module", predict_module)
+
+    def no_cache(*args, **kwargs):
+        raise AssertionError("Inference must not access the training cache")
+
+    monkeypatch.setattr("birdclef.data.embeddings._cache_paths", no_cache)
+    windows = audio_frames[1].iloc[::-1].assign(row_id=["requested-second", "requested-first"])
+    expected = [model.predict(windows).set_index("row_id") for model in models.values()]
+    template = windows[["row_id"]].assign(b=0.0, a=0.0)
+    counts = []
+    original = PerchEncoder.__call__
+
+    def extract(self, inputs):
+        counts.append(len(inputs))
+        return original(self, inputs)
+
+    monkeypatch.setattr(PerchEncoder, "__call__", extract)
+    for _ in range(2):
+        result = predict_runs([Path("mlp"), Path("rnn")], windows, template, weights=[3, 1])
+        np.testing.assert_allclose(
+            result[["b", "a"]],
+            (3 * expected[0][["b", "a"]] + expected[1][["b", "a"]]) / 4,
+            atol=1e-6,
+        )
+        assert result.row_id.tolist() == windows.row_id.tolist()
+    assert sum(counts) == 24 * (1 if same_encoder else 2)
+
+
 @pytest.mark.parametrize("weights", [[1], [0, 1], [-1, 1], [float("nan"), 1], [float("inf"), 1]])
 def test_ensemble_rejects_invalid_weights_before_loading_models(weights):
     pytest.importorskip("lightning")
