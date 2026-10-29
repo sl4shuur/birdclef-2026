@@ -122,7 +122,9 @@ def test_export_keeps_only_best_checkpoint_and_portable_metadata(tmp_path):
     )
     (run / "fit.json").write_text(json.dumps({"best_checkpoint": "checkpoints/best.ckpt"}))
     output = tmp_path / "models.zip"
-    result = CliRunner().invoke(export_models, ["--run", str(run), "--output", str(output)])
+    result = CliRunner().invoke(
+        export_models, ["--run", str(run), "--all", "--output", str(output)]
+    )
     assert result.exit_code == 0, result.output
     with ZipFile(output) as archive:
         assert {name for name in archive.namelist() if not name.endswith("/")} == {
@@ -133,3 +135,122 @@ def test_export_keeps_only_best_checkpoint_and_portable_metadata(tmp_path):
         }
         assert archive.read("model/checkpoints/best.ckpt") == b"best checkpoint"
         assert "api_key" not in archive.read("model/model-config.json").decode()
+
+
+@pytest.fixture
+def export_run(tmp_path):
+    from birdclef.models import AudioExperimentConfig
+
+    def create(name, *, completed=False):
+        run = tmp_path / name
+        (run / "checkpoints").mkdir(parents=True)
+        (run / "checkpoints/last.ckpt").write_bytes(b"last checkpoint")
+        (run / "classes.json").write_text(json.dumps(["a", "b"]))
+        (run / "model-config.json").write_text(
+            json.dumps(AudioExperimentConfig().safe_dump()), encoding="utf-8"
+        )
+        if completed:
+            (run / "checkpoints/best.ckpt").write_bytes(b"best checkpoint")
+            (run / "fit.json").write_text(json.dumps({"best_checkpoint": "checkpoints/best.ckpt"}))
+        return run
+
+    return create
+
+
+def test_export_discovers_nested_runs_deduplicates_roots_and_normalizes_interrupted_metadata(
+    tmp_path, export_run
+):
+    from birdclef.models import read_fit_state
+
+    interrupted = export_run("models/paused")
+    completed = export_run("models/done", completed=True)
+    incomplete = tmp_path / "models/incomplete"
+    incomplete.mkdir()
+    (incomplete / "model-config.json").write_text("{}")
+    output = tmp_path / "models.zip"
+    result = CliRunner().invoke(
+        export_models,
+        [
+            "--run",
+            str(tmp_path / "models"),
+            "--run",
+            str(interrupted),
+            "--all",
+            "--output",
+            str(output),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "Skipping" in result.output
+    with ZipFile(output) as archive:
+        assert archive.read("paused/checkpoints/last.ckpt") == b"last checkpoint"
+        assert archive.read("done/checkpoints/best.ckpt") == b"best checkpoint"
+        assert (
+            json.loads(archive.read("paused/fit.json"))["best_checkpoint"]
+            == "checkpoints/last.ckpt"
+        )
+        assert len([name for name in archive.namelist() if name.endswith("model-config.json")]) == 2
+        archive.extractall(tmp_path / "unpacked")
+    restored = tmp_path / "unpacked/paused"
+    assert read_fit_state(restored).best_path(restored).read_bytes() == b"last checkpoint"
+    assert not (interrupted / "fit.json").exists()
+    assert read_fit_state(completed).best_checkpoint == "checkpoints/best.ckpt"
+
+
+def test_export_real_checkbox_selects_only_the_checked_model(tmp_path, export_run, monkeypatch):
+    import questionary
+    from prompt_toolkit.input import create_pipe_input
+    from prompt_toolkit.output import DummyOutput
+
+    export_run("a")
+    export_run("b")
+    checkbox = questionary.checkbox
+    labels = []
+    with create_pipe_input() as pipe:
+
+        def prompt(message, **kwargs):
+            labels.extend(choice.title for choice in kwargs["choices"])
+            return checkbox(message, **kwargs, input=pipe, output=DummyOutput())
+
+        monkeypatch.setattr(questionary, "checkbox", prompt)
+        pipe.send_text("\x1b[B \r")  # Down, Space, Enter: select only the second run.
+        output = tmp_path / "selected.zip"
+        result = CliRunner().invoke(
+            export_models, ["--run", str(tmp_path), "--output", str(output)]
+        )
+    assert result.exit_code == 0, result.output
+    assert all("last.ckpt" in label for label in labels)
+    with ZipFile(output) as archive:
+        assert {name.split("/")[0] for name in archive.namelist()} == {"b"}
+
+
+@pytest.mark.parametrize("answer", [[], None])
+def test_empty_or_cancelled_selection_preserves_existing_archive(
+    tmp_path, export_run, monkeypatch, answer
+):
+    import questionary
+
+    run = export_run("model")
+    output = tmp_path / "models.zip"
+    output.write_bytes(b"previous archive")
+    monkeypatch.setattr(
+        questionary, "checkbox", lambda *args, **kwargs: SimpleNamespace(ask=lambda: answer)
+    )
+    result = CliRunner().invoke(export_models, ["--run", str(run), "--output", str(output)])
+    assert result.exit_code == (1 if answer is None else 0)
+    assert output.read_bytes() == b"previous archive"
+
+
+def test_inference_checkpoint_fallback_does_not_hide_a_missing_recorded_best(tmp_path, export_run):
+    from birdclef.models import FitState
+
+    run = export_run("paused")
+    with pytest.raises(ValueError, match="best checkpoint"):
+        FitState().best_path(run)
+    assert FitState().inference_path(run) == run / "checkpoints/last.ckpt"
+    with pytest.raises(FileNotFoundError):
+        FitState(best_checkpoint="checkpoints/missing.ckpt").inference_path(run)
+    outside = tmp_path / "outside.ckpt"
+    outside.touch()
+    with pytest.raises(ValueError, match="stay inside"):
+        FitState(best_checkpoint="../outside.ckpt").inference_path(run)

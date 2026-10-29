@@ -294,6 +294,11 @@ def test_validation_is_pooled_and_checkpoint_restores_predictions_without_downlo
     assert ensemble.columns.tolist() == ["row_id", "b", "a"]
     np.testing.assert_allclose(ensemble[["a", "b"]], expected.numpy(), atol=1e-6)
     assert all(weights is None for weights in seen)
+    (tmp_path / "checkpoints").mkdir()
+    trainer.save_checkpoint(tmp_path / "checkpoints/last.ckpt")
+    (tmp_path / "fit.json").unlink()
+    interrupted = AudioCNN.from_run(tmp_path).predict(manifest)
+    np.testing.assert_allclose(interrupted[["a", "b"]], expected.numpy(), atol=1e-6)
     (tmp_path / "classes.json").write_text(json.dumps(["b", "a"]))
     with pytest.raises(ValueError, match="class order"):
         AudioCNN.from_run(tmp_path).predict(manifest)
