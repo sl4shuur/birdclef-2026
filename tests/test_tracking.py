@@ -75,8 +75,8 @@ def test_audio_fit_cli_uses_wandb_and_saves_secret_free_artifacts(tmp_path, monk
     import wandb
     from lightning.pytorch.utilities import rank_zero_only
 
-    from birdclef.models import AudioCNN, AudioExperimentConfig
-    from birdclef.models.audio_cnn.fit import fit
+    from birdclef.models import AudioClassifier, AudioExperimentConfig
+    from birdclef.models.classifier.fit import fit
 
     tracker = Mock()
     monkeypatch.setattr(rank_zero_only, "rank", rank)
@@ -117,7 +117,7 @@ def test_audio_fit_cli_uses_wandb_and_saves_secret_free_artifacts(tmp_path, monk
             "species,positive,negative,auc\nbird,1,1,1\n"
         )
 
-    monkeypatch.setattr(AudioCNN, "fit", fake_fit)
+    monkeypatch.setattr(AudioClassifier, "fit", fake_fit)
     payload = {
         "data": {"output_dir": str(tmp_path / "outputs")},
         "model": {},

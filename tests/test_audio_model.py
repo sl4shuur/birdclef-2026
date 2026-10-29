@@ -17,10 +17,10 @@ from torch.optim import AdamW  # noqa: E402
 from birdclef.config import LoaderConfig, LRSchedulerConfig, RuntimeConfig  # noqa: E402
 from birdclef.data.audio import read_audio_window  # noqa: E402
 from birdclef.data.prepared import audio_training_datasets, load_audio_split  # noqa: E402
-from birdclef.models.audio_cnn import network  # noqa: E402
-from birdclef.models.audio_cnn.config import AudioExperimentConfig, AudioModelConfig  # noqa: E402
-from birdclef.models.audio_cnn.model import AudioCNN  # noqa: E402
-from birdclef.models.audio_cnn.network import AudioCNNModule  # noqa: E402
+from birdclef.models.classifier.audio_cnn import network  # noqa: E402
+from birdclef.models.classifier.audio_cnn.network import AudioCNNModule  # noqa: E402
+from birdclef.models.classifier.config import AudioExperimentConfig, AudioModelConfig  # noqa: E402
+from birdclef.models.classifier.model import AudioClassifier  # noqa: E402
 from birdclef.processing.audio import log_mel  # noqa: E402
 
 
@@ -284,7 +284,7 @@ def test_validation_is_pooled_and_checkpoint_restores_predictions_without_downlo
     module.eval()
     with torch.inference_mode():
         expected = module.predict_batch(log_mel(read_audio_window(path)).unsqueeze(0))
-    restored = AudioCNN.from_run(tmp_path)
+    restored = AudioClassifier.from_run(tmp_path)
     result = restored.predict(manifest)
     assert result.columns.tolist() == ["row_id", "a", "b"]
     assert result.row_id.tolist() == ["clip_5"]
@@ -300,15 +300,15 @@ def test_validation_is_pooled_and_checkpoint_restores_predictions_without_downlo
     (tmp_path / "checkpoints").mkdir()
     trainer.save_checkpoint(tmp_path / "checkpoints/last.ckpt")
     (tmp_path / "fit.json").unlink()
-    interrupted = AudioCNN.from_run(tmp_path).predict(manifest)
+    interrupted = AudioClassifier.from_run(tmp_path).predict(manifest)
     np.testing.assert_allclose(interrupted[["a", "b"]], expected.numpy(), atol=1e-6)
     (tmp_path / "classes.json").write_text(json.dumps(["b", "a"]))
     with pytest.raises(ValueError, match="class order"):
-        AudioCNN.from_run(tmp_path).predict(manifest)
+        AudioClassifier.from_run(tmp_path).predict(manifest)
     (tmp_path / "classes.json").write_text(json.dumps(["a", "b"]))
     (tmp_path / "classes.json").unlink()
     with pytest.raises(FileNotFoundError, match="classes.json"):
-        AudioCNN.from_run(tmp_path)
+        AudioClassifier.from_run(tmp_path)
 
 
 def test_prepared_split_checks_identity_and_preserves_recording_groups(tmp_path):

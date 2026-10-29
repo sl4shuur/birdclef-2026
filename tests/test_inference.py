@@ -14,7 +14,7 @@ from birdclef.submission.export import main as export_models
 
 def test_ensemble_aligns_rows_and_classes_and_overrides_training_hardware(monkeypatch):
     pytest.importorskip("lightning")
-    from birdclef.models import AudioCNN
+    from birdclef.models import AudioClassifier
 
     frames = {
         "a": pd.DataFrame({"row_id": ["x_5", "x_10"], "a": [0.2, 0.4], "b": [0.8, 0.6]}),
@@ -37,7 +37,7 @@ def test_ensemble_aligns_rows_and_classes_and_overrides_training_hardware(monkey
             assert not self.config.loader.pin_memory
             return frames[self.path.name]
 
-    monkeypatch.setattr(AudioCNN, "from_run", Model)
+    monkeypatch.setattr(AudioClassifier, "from_run", Model)
     windows = pd.DataFrame({"row_id": ["x_5", "x_10"]})
     template = windows.assign(a=0.0, b=0.0)
     result = predict_runs([Path("a"), Path("b")], windows, template, weights=[1, 3], batch_size=8)
