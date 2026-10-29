@@ -16,8 +16,10 @@ the real experiment. Smoke outputs live in separate `smoke/` folders.
    Use BCE, normal random focal crops and `val/auc` checkpoint selection. Both learning
    rates are `3e-4` for D1. No projection or teacher is used at this stage.
 
-Defaults: fold 0, seed 42, batch 32, soundscape probability 0.1, AdamW with weight
-decay 0.01, at most 5 feature epochs (patience 2) and 10 supervised epochs (patience 3).
+Both notebooks use fold 0, seed 42, soundscape probability 0.1 and AdamW with weight
+decay 0.01. The local example uses batch 32 and up to 5 epochs per stage;
+the Colab example uses batch 64, 5 feature epochs and 10 supervised epochs.
+The reported D1 run stopped after 3 supervised epochs.
 Reduce batch size if GPU memory is insufficient. W&B is offline for smoke and online
 for the real notebook run. Training resumes from each stage's `last.ckpt`.
 The local notebook uses zero loader workers and disables pinned memory to reduce
@@ -42,9 +44,8 @@ Update the models Dataset with the ZIP and the wheelhouse Dataset with this pack
 python -m scripts.kaggle.wheelhouse publish
 ```
 
-The current `birdclef-submit` notebook needs no code changes. It selects
-`available_runs[0]`, so ensure the desired classifier is the first/only discovered
-run in the attached model data. Do not attach Stage-1 training output: it also has
+In `birdclef-submit`, select the exported student with `MODEL_WEIGHTS = {"full-ft": 1.0}`.
+Do not attach Stage-1 training output: it also has
 `fit.json` but is not a classifier. Export includes neither Perch, its cache,
 `encoder.pt` nor the projection. CPU inference restores the classifier checkpoint
 and does not read the original initialization file.
