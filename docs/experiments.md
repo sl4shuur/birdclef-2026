@@ -25,7 +25,7 @@ Training length and checkpoints can differ. The table does not show the effect o
 | Perch v2 — 4th-place solution writeup standalone LB (split unspecified) | -                                  |                        - |       ~0.928 |             - |
 
 The trained MLP improves on the native-head zero-shot submission by **0.06501 public**
-and **0.05494 private** ROC-AUC. It has the highest measured scores among our submissions.
+and **0.05494 private** ROC-AUC. It has the highest measured scores among our single-model submissions.
 Training stopped early after 10 epochs. The encoder stayed frozen; only the head trained.
 
 The head uses LayerNorm, a 512-unit hidden layer, ReLU, dropout 0.3 and an output layer for 234 classes. Head LR: `1e-3`; weight decay: `0.01`; batch size: `256`; soundscape sampling probability: `0.1`; seed: `42`.
@@ -47,10 +47,21 @@ soundscape sequence probability 0.01 and seed 42.
 | lstm256-reg: BiLSTM-256, dropout 0.5, LR `5e-4`, seed 43 | BirdCLEF submit, v7 | **0.93260** | 0.86839 | 0.87881 |
 | mlp512-drop50: MLP-512, dropout 0.5, LR `1e-3`, seed 42 | BirdCLEF submit, v8 | 0.93036 | **0.88911** | **0.89546** |
 
-Higher local AUC did not improve private scores. The original MLP remains best
+Higher local AUC did not improve private scores. The original MLP remains the best single model
 (public 0.89013, private 0.89707). [Full search report](perch-head-search-20261029.md).
 
 The [4th-place solution writeup](https://www.kaggle.com/competitions/birdclef-2026/writeups/4-th-place-solution) reports **~0.928 standalone LB for Perch v2** in its model summary table.
+
+## Perch → EfficientNet distillation
+
+| Experiment | Kaggle notebook version | Local ROC-AUC | Public | Private |
+| --- | --- | ---: | ---: | ---: |
+| D0: ImageNet EfficientNet-B0, full fine-tuning (historical baseline) | BirdCLEF submit, v1 | 0.87771 | 0.80213 | 0.82236 |
+| D1: Perch feature distillation → EfficientNet-B0 full fine-tuning | BirdCLEF submit, v16 | **0.89463** | **0.82217** | **0.84502** |
+
+D1 completed 3 supervised epochs; the best checkpoint is `epoch002.ckpt`.
+The student improved over the historical baseline, with different training budgets.
+Inference uses only EfficientNet; Perch and its cache are not required.
 
 ## Final Perch ensembles
 
