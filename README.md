@@ -31,9 +31,9 @@ The project supports **local, Kaggle and Colab** training, with offline CPU infe
 ### 3. Final Deliverables
 
 - [x] Reproducible Python training and inference code.
-- [ ] Screenshots of Kaggle submission results.
-- [ ] Short PDF report covering EDA, methodology, experiments, results, and limitations.
-- [ ] Proposed future improvements with additional time and compute.
+- [x] Screenshots of Kaggle submission results.
+- [x] Short PDF report covering EDA, methodology, experiments, results, and limitations.
+- [x] Proposed future improvements with additional time and compute.
 
 ## Local Setup
 
