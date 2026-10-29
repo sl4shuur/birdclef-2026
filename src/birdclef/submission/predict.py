@@ -42,6 +42,9 @@ def predict_runs(
     loader = LoaderConfig(predict_batch_size=batch_size, num_workers=num_workers)
     classes = class_columns(template)
     predictions = []
+    # TODO: Share Perch embeddings across ensemble models with identical encoder
+    # and preprocessing, instead of extracting them for each run. Benchmark CPU
+    # inference against Kaggle's time limit before final ensembling.
     for run in runs:
         print(f"Model: {run}", flush=True)
         config = read_model_config(run / "model-config.json")
