@@ -84,6 +84,8 @@ uv run pyright
 uv run pytest
 ```
 
+`pytest` runs fast checks. Use `uv run pytest -m slow` for training, checkpoint, DDP and fresh-process checks. Use `uv run pytest -m ""` to run both groups.
+
 ## Prepare and train
 
 1. Run [data_prep.ipynb](notebooks/local/data_prep.ipynb). It saves files in `outputs/data_prep`.

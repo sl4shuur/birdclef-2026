@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 
+@pytest.mark.slow
 def test_lightweight_package_imports_do_not_load_optional_ml_dependencies():
     env = os.environ.copy()
     env["PYTHONPATH"] = str(Path(__file__).resolve().parents[1] / "src")

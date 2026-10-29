@@ -32,6 +32,7 @@ def first_conv(features: nn.Sequential) -> nn.Conv2d:
     return convolution
 
 
+@pytest.mark.slow
 def test_two_process_training_unfreezes_synchronously_and_scores_without_padding(tmp_path):
     import os
     import subprocess
@@ -127,6 +128,7 @@ def test_frozen_blocks_keep_weights_and_batchnorm_statistics_while_head_trains(l
 
 
 @pytest.mark.parametrize("scheduler", ["none", "cosine", "plateau"])
+@pytest.mark.slow
 def test_gradual_unfreezing_resumes_at_the_right_epoch_with_optimizer_and_scheduler(
     tmp_path, scheduler
 ):
@@ -217,6 +219,7 @@ def test_pretrained_stem_averages_rgb_and_offline_initialization_skips_weights(m
     assert seen[-1] is None
 
 
+@pytest.mark.slow
 def test_validation_is_pooled_and_checkpoint_restores_predictions_without_download(
     tmp_path, monkeypatch
 ):

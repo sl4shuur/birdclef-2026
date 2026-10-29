@@ -73,6 +73,8 @@ select = ["E", "F", "I", "UP", "B", "C4"]
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
+addopts = "-m 'not slow'"
+markers = ["slow: training, checkpoint, DDP and fresh-process checks (pytest -m slow)"]
 
 [tool.pyright]
 include = ["src", "scripts", "tests"]
