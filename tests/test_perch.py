@@ -30,52 +30,6 @@ from birdclef.submission import predict_runs  # noqa: E402
 from birdclef.submission.export import main as export_models  # noqa: E402
 
 
-@pytest.fixture
-def encoder_path(tmp_path):
-    """Tiny real ONNX graph: two features, to catch hardcoded Perch dimensions."""
-    helper = onnx.helper
-    graph = helper.make_graph(
-        [
-            helper.make_node("ReduceMean", ["inputs", "axes"], ["mean"], keepdims=1),
-            helper.make_node("Neg", ["mean"], ["negative"]),
-            helper.make_node("Concat", ["mean", "negative"], ["embedding"], axis=1),
-        ],
-        "test-encoder",
-        [helper.make_tensor_value_info("inputs", onnx.TensorProto.FLOAT, ["batch", 160000])],
-        [helper.make_tensor_value_info("embedding", onnx.TensorProto.FLOAT, ["batch", 2])],
-        [helper.make_tensor("axes", onnx.TensorProto.INT64, [1], [1])],
-    )
-    model = helper.make_model(graph, opset_imports=[helper.make_opsetid("", 18)])
-    model.ir_version = 10
-    path = tmp_path / "test.onnx"
-    onnx.save(model, path)
-    return path
-
-
-@pytest.fixture
-def audio_frames(tmp_path):
-    frames = []
-    for name, source in [("focal", "focal"), ("train", "soundscape"), ("valid", "soundscape")]:
-        path = tmp_path / f"{name}.wav"
-        sf.write(path, np.repeat(np.array([0.1, -0.2], dtype=np.float32), 5 * 32000), 32000)
-        frames.append(
-            pd.DataFrame(
-                {
-                    "filename": [path.name] * 2,
-                    "path": [str(path)] * 2,
-                    "source": [source] * 2,
-                    "start": [0, 5],
-                    "end": [5, 10],
-                    "row_id": [f"{name}_5", f"{name}_10"],
-                    "a": [1, 0],
-                    "b": [0, 1],
-                }
-            )
-        )
-    focal, train, valid = frames
-    return pd.concat([focal.iloc[:1], train], ignore_index=True), valid
-
-
 @pytest.mark.parametrize("fixed_batch", [None, 1, 2])
 def test_encoder_respects_export_batch_size_including_the_last_partial_batch(
     encoder_path, fixed_batch
