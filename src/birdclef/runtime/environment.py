@@ -12,13 +12,15 @@ _DEFAULTS: dict[Environment, dict[str, str]] = {
     "kaggle": {
         "BCLEF_DATA__COMPETITION_DIR": "/kaggle/input/competitions/birdclef-2026",
         "BCLEF_DATA__OUTPUT_DIR": "/kaggle/working",
+        "BCLEF_DATA__CACHE_DIR": "/kaggle/working/cache",
         "BCLEF_LOGGING__DIRECTORY": "/kaggle/working/logs",
         "BCLEF_LOADER__PIN_MEMORY": "true",
     },
     "colab": {
-        "BCLEF_DATA__COMPETITION_DIR": "/content/drive/MyDrive/data/competition",
-        "BCLEF_DATA__OUTPUT_DIR": "/content/drive/MyDrive/outputs",
-        "BCLEF_LOGGING__DIRECTORY": "/content/drive/MyDrive/outputs/logs",
+        "BCLEF_DATA__COMPETITION_DIR": "/content/drive/Shareddrives/BirdCLEF2026/data/competition",
+        "BCLEF_DATA__OUTPUT_DIR": "/content/drive/Shareddrives/BirdCLEF2026/outputs",
+        "BCLEF_DATA__CACHE_DIR": "/content/drive/Shareddrives/BirdCLEF2026/data/cache",
+        "BCLEF_LOGGING__DIRECTORY": "/content/drive/Shareddrives/BirdCLEF2026/outputs/logs",
         "BCLEF_LOADER__PIN_MEMORY": "true",
     },
     "local": {},

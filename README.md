@@ -6,7 +6,7 @@ A deep-learning project for the [BirdCLEF+ 2026 Kaggle competition](https://www.
 
 The task is **multi-label audio classification**: predict the presence of 234 animal classes in 5-second soundscape segments, evaluated using macro-averaged ROC-AUC excluding classes without positive targets.
 
-The project supports **local, Kaggle, and Google Colab** workflows, with modular training, evaluation, and inference pipelines.
+The project supports **local and Kaggle** training and inference. Colab bundle tooling and path defaults are available, but its starter notebook still needs an API update; see [remote setup](docs/remote.md).
 
 ## TODO
 
@@ -17,12 +17,12 @@ The project supports **local, Kaggle, and Google Colab** workflows, with modular
 - [x] Design modular, readable, and scalable training and inference pipelines.
 - [x] Add label encoding, recording-level holdout, competition metric, and submission tools.
 - [x] Implement audio preprocessing and select a baseline validation protocol.
-- [ ] Train a baseline model and implement CPU-compatible inference.
-- [ ] Submit the baseline to Kaggle and record the leaderboard score.
+- [x] Train a baseline model and implement CPU-compatible inference.
+- [x] Submit the baseline to Kaggle and record the leaderboard score.
 
 ### 2. Model Improvements
 
-- [ ] Explore pretrained audio models, including Perch.
+- [x] Explore pretrained audio models, including Perch.
 - [ ] Implement knowledge distillation from a pretrained teacher into a smaller student model.
 - [ ] Introduce recurrent layers (e.g., GRU/LSTM) for temporal modeling.
 - [ ] Experiment with other improvements, such as augmentations, sampling strategies, and pseudo-labeling.
@@ -30,7 +30,7 @@ The project supports **local, Kaggle, and Google Colab** workflows, with modular
 
 ### 3. Final Deliverables
 
-- [ ] Reproducible Python training and inference code.
+- [x] Reproducible Python training and inference code.
 - [ ] Screenshots of Kaggle submission results.
 - [ ] Short PDF report covering EDA, methodology, experiments, results, and limitations.
 - [ ] Proposed future improvements with additional time and compute.
@@ -84,7 +84,7 @@ uv run pyright
 uv run pytest
 ```
 
-`pytest` runs fast checks. Use `uv run pytest -m slow` for training, checkpoint, DDP and fresh-process checks. Use `uv run pytest -m ""` to run both groups.
+`pytest` runs fast checks. Use `uv run pytest -m slow` for training, checkpoint, DDP and fresh-process checks. Before merging, run both groups with `uv run pytest -o "addopts="`, including the Perch training/resume/export and DDP integration checks.
 
 ## Prepare and train
 
@@ -96,7 +96,13 @@ uv run pytest
 Run the same name to continue training. Use a new name when you change the data, fold or training settings. Saved configs do not include API keys.
 
 For Kaggle or Colab, see [remote setup](docs/remote.md).
-For model settings and saved files, see [training details](src/birdclef/models/audio_cnn/README.md).
+For model layout and training commands, see [training details](src/birdclef/models/README.md).
+
+For **frozen Perch v2 + MLP**, open
+[perch_mlp.ipynb](notebooks/local/perch_mlp.ipynb) and install the additional `perch`
+extra. Embeddings are cached in `data.cache_dir` (`BCLEF_DATA__CACHE_DIR`), which can
+also point to a complete cache attached as a Kaggle Dataset. See
+[Perch settings and cache](src/birdclef/models/encoders/perch.md) for the workflow.
 
 ## Submit on Kaggle
 

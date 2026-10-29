@@ -83,7 +83,7 @@ def test_resolution_and_download_target_snapshot_python(scripts, monkeypatch, tm
     args = compile_command.call_args.args
     assert args[args.index("--python-version") + 1] == "3.12"
     assert "--no-sources" in args and "--no-config" in args
-    assert args.count("--extra") == 3
+    assert args.count("--extra") == 4
     assert "audio" in args
     download = Mock()
     monkeypatch.setattr(dataset, "run", download)
@@ -142,7 +142,10 @@ def test_dataset_requirements_include_notebook_extras(scripts, monkeypatch, tmp_
     monkeypatch.setattr(scripts["dataset"], "STAGE", tmp_path)
     monkeypatch.setattr(scripts["dataset"], "DATASET", "user/wheels")
     requirements = scripts["dataset"].write_dataset_files("0.1.0", {"lightning": "2.5.0"})
-    assert requirements == "birdclef-2026[notebooks,audio,deep-learning]==0.1.0\nlightning==2.5.0\n"
+    assert (
+        requirements
+        == "birdclef-2026[notebooks,audio,deep-learning,perch]==0.1.0\nlightning==2.5.0\n"
+    )
     assert json.loads((tmp_path / "dataset-metadata.json").read_text())["id"] == "user/wheels"
 
 
@@ -182,7 +185,8 @@ def test_build_uses_normalized_wheel_filename_and_project_metadata(scripts, monk
     monkeypatch.setattr(common, "run", build)
     assert common.build_wheel(stage) == "0.1.0"
     assert (
-        common.project_requirement("0.1.0") == "audio-project[notebooks,audio,deep-learning]==0.1.0"
+        common.project_requirement("0.1.0")
+        == "audio-project[notebooks,audio,deep-learning,perch]==0.1.0"
     )
 
 

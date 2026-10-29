@@ -5,10 +5,10 @@ from hashlib import sha256
 from pathlib import Path
 
 import pandas as pd
-from torch.utils.data import ConcatDataset
 
-from birdclef.data.audio import FocalAudioDataset, SoundscapeDataset
+from birdclef.data.audio import FocalAudioDataset, SoundscapeDataset, Transform
 from birdclef.data.labels import align_targets
+from birdclef.data.sampling import MixedSourceDataset
 from birdclef.processing import log_mel
 
 
@@ -57,8 +57,13 @@ def load_audio_split(
 
 
 def audio_training_datasets(
-    train: pd.DataFrame, valid: pd.DataFrame, *, classes: list[str]
-) -> tuple[ConcatDataset, SoundscapeDataset]:
+    train: pd.DataFrame,
+    valid: pd.DataFrame,
+    *,
+    classes: list[str],
+    transform: Transform | None = log_mel,
+    random_crop: bool = True,
+) -> tuple[MixedSourceDataset, SoundscapeDataset]:
     """Mixed-source training and soundscape-only validation, with no recording leakage."""
     if train.empty or valid.empty:
         raise ValueError("Training and validation must be nonempty.")
@@ -74,10 +79,10 @@ def audio_training_datasets(
     if set(soundscapes.filename) & set(valid.filename):
         raise ValueError("Training and validation soundscape recordings overlap.")
     focal_dataset = FocalAudioDataset(
-        focal, focal.set_index("filename")[classes], training=True, transform=log_mel
+        focal, focal.set_index("filename")[classes], training=random_crop, transform=transform
     )
     sc_dataset = SoundscapeDataset(
-        soundscapes, soundscapes.set_index("row_id")[classes], transform=log_mel
+        soundscapes, soundscapes.set_index("row_id")[classes], transform=transform
     )
-    validation = SoundscapeDataset(valid, valid.set_index("row_id")[classes], transform=log_mel)
-    return ConcatDataset([focal_dataset, sc_dataset]), validation
+    validation = SoundscapeDataset(valid, valid.set_index("row_id")[classes], transform=transform)
+    return MixedSourceDataset({"focal": focal_dataset, "soundscape": sc_dataset}), validation

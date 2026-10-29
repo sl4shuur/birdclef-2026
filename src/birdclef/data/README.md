@@ -43,7 +43,9 @@ that sites or sounds are independent.
 saved folds. Training has focal clips and soundscapes; validation has soundscapes
 only. Shared soundscape files between train and validation cause an error.
 
-`SourceWeightedRandomSampler` expects `ConcatDataset([focal, soundscapes])`.
+`MixedSourceDataset` keeps named datasets and each example's source in concatenation
+order. `SourceWeightedRandomSampler` takes that explicit source list, so reversing
+the datasets cannot silently reverse their sampling probabilities.
 It samples with replacement: weights are `(1-p)/N_focal` and `p/N_soundscape`.
 `loader.soundscape_probability` sets `p` (default 0.1). This is an expected source
 fraction, not a class balance rule or an exact fraction in every batch.
@@ -56,3 +58,8 @@ its scores use all unique windows after distributed padding is removed.
 
 For saved numeric features, use `multilabel_dataset` and `FeatureDataset`.
 Datasets handle loading and targets; models handle learned steps and predictions.
+
+`embeddings.py` batches a supplied feature extractor and reads/writes a portable
+cache. The caller chooses its complete namespace. It stores vectors and sample
+identities, without labels, folds or model construction. A complete indexed cache
+works without source audio and without writes; `cache_dir=None` extracts directly.

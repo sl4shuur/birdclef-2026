@@ -61,6 +61,7 @@ class LoggingConfig(ConfigModel):
 
 class DataConfig(ConfigModel):
     competition_dir: ProjectPath = Field(default=Path("data/competition"), validate_default=True)
+    cache_dir: ProjectPath = Field(default=Path("data/cache"), validate_default=True)
     # Runs are written to a subfolder named after the run.
     output_dir: ProjectPath = Field(default=Path("outputs"), validate_default=True)
 

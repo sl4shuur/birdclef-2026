@@ -27,7 +27,7 @@ def predict_runs(
     uses one CPU, FP32, no tracker and no pretrained-weight downloads.
     """
     from birdclef.config import LoaderConfig, RuntimeConfig
-    from birdclef.models import AudioCNN
+    from birdclef.models import AudioClassifier
 
     if not runs:
         raise ValueError("Select at least one model run.")
@@ -44,7 +44,7 @@ def predict_runs(
     predictions = []
     for run in runs:
         print(f"Model: {run}", flush=True)
-        model = AudioCNN.from_run(run)
+        model = AudioClassifier.from_run(run)
         model.config.runtime = RuntimeConfig(accelerator="cpu", devices=1, precision="32-true")
         model.config.loader = loader
         prediction = build_submission(model.predict(windows), template)
@@ -73,7 +73,7 @@ def run_inference(
     sample = pd.read_csv(competition_dir / "sample_submission.csv")
     classes = class_columns(sample)
     directory = soundscapes if soundscapes is not None else competition_dir / "test_soundscapes"
-    preview = soundscapes is None and directory.is_dir() and not any(directory.glob("*.ogg"))
+    preview = soundscapes is None and not any(directory.glob("*.ogg"))
     if preview:
         print("No visible test audio: checking one training minute before submission.", flush=True)
         directory = competition_dir / "train_soundscapes"

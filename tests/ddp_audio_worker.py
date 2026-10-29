@@ -20,16 +20,22 @@ from birdclef.config import (
 )
 from birdclef.experiment import RunContext
 from birdclef.loggers import CustomLogger, wandb_run
-from birdclef.models import AudioCNN, AudioCNNModule, AudioExperimentConfig, AudioModelConfig
-from birdclef.models.audio_cnn import model as audio_model
+from birdclef.models import (
+    AudioClassifier,
+    AudioClassifierModule,
+    AudioExperimentConfig,
+    AudioModelConfig,
+)
+from birdclef.models.classifier import backends
 
 ROOT = Path(sys.argv[1]).resolve()
 ACCELERATOR = "gpu" if sys.argv[2] == "gpu" else "cpu"
 
 
-class AuditedModule(AudioCNNModule):
+class AuditedModule(AudioClassifierModule):
     def on_train_epoch_start(self) -> None:
         super().on_train_epoch_start()
+        assert isinstance(self.encoder, torch.nn.Sequential)
         assert all(not parameter.requires_grad for parameter in self.encoder[0].parameters())
         assert all(
             parameter.requires_grad == (self.current_epoch >= 1)
@@ -39,6 +45,7 @@ class AuditedModule(AudioCNNModule):
 
     def on_validation_epoch_start(self) -> None:
         super().on_validation_epoch_start()
+        assert isinstance(self.encoder, torch.nn.Sequential)
         weight = next(self.encoder[-1].parameters()).detach()
         gathered = self.all_gather(weight)
         assert isinstance(gathered, torch.Tensor)
@@ -136,8 +143,8 @@ def main() -> None:
         tracking=TrackingConfig(offline=True),
     )
     config.logging = LoggingConfig(directory=ROOT / "logs")
-    audio_model.AudioCNNModule = AuditedModule
-    model = AudioCNN(config, classes=["bird", "owl"])
+    backends.AudioClassifierModule = AuditedModule
+    model = AudioClassifier(config, classes=["bird", "owl"])
     logger = CustomLogger("ddp-check", config=config.logging)
     with wandb_run(config.tracking, name="ddp-check", save_dir=ROOT / "run") as tracker:
         model.fit(training, validation, RunContext(ROOT / "run", tracker, logger, "ddp-check"))

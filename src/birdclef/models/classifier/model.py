@@ -8,36 +8,46 @@ import lightning as L
 import pandas as pd
 import torch
 from lightning.pytorch.utilities import rank_zero_only
+from torch.utils.data import Dataset
 
 from birdclef.competition import ROW_ID, class_columns
 from birdclef.data import (
-    InferenceSoundscapeDataset,
     SourceWeightedRandomSampler,
     TrainingDataModule,
-    audio_training_datasets,
     prediction_dataloader,
 )
+from birdclef.data.sampling import MixedSourceDataset
 from birdclef.eval import evaluate, score
 from birdclef.experiment import BirdClefModel, RunContext
 from birdclef.models import (
-    AudioCNNModule,
     AudioExperimentConfig,
-    check_fit_inputs,
     fit_module,
     predict_module,
     read_fit_state,
 )
-from birdclef.processing import log_mel
+from birdclef.models.classifier.backends import ClassifierBackend, backend_class
+from birdclef.models.classifier.network import AudioClassifierModule
 from birdclef.submission import validate_row_ids
 
 
-class AudioCNN(BirdClefModel):
-    def __init__(self, config: AudioExperimentConfig, *, classes: list[str]) -> None:
+class AudioClassifier(BirdClefModel):
+    def __init__(
+        self,
+        config: AudioExperimentConfig,
+        *,
+        classes: list[str],
+        backend: ClassifierBackend | None = None,
+    ) -> None:
         self.config = config
         self.classes = class_columns(pd.DataFrame(columns=[ROW_ID, *classes]))
-        self._module: AudioCNNModule | None = None
+        self._module: AudioClassifierModule | None = None
         self._best: Path | None = None
         self.sampler: SourceWeightedRandomSampler | None = None
+        self.backend = (
+            backend
+            if backend is not None
+            else backend_class(config.model.encoder)(config, self.classes)
+        )
 
     @classmethod
     def from_run(cls, output_dir: Path, *, config: AudioExperimentConfig | None = None) -> Self:
@@ -51,10 +61,8 @@ class AudioCNN(BirdClefModel):
             saved.runtime = config.runtime
             saved.loader = config.loader
         model = cls(saved, classes=classes)
-        # A trained checkpoint contains every weight. Never download ImageNet at inference.
-        model._module = AudioCNNModule(
-            saved.model, saved.lr_scheduler, classes=classes, initialize_pretrained=False
-        )
+        model.backend.restore(output_dir)
+        model._module = model.backend.module(initialize_pretrained=False)
         model._best = read_fit_state(output_dir).inference_path(output_dir)
         return model
 
@@ -63,28 +71,16 @@ class AudioCNN(BirdClefModel):
         classes = self.classes
         validate_row_ids(valid)
         L.seed_everything(config.train.seed, workers=True)
-        training, validation = audio_training_datasets(train, valid, classes=classes)
-        # Check full-fold AUC feasibility before downloading weights or training.
         score(valid[[ROW_ID, *classes]], valid[[ROW_ID, *classes]])
-        columns = ["source", "filename", "path", "start", "end", ROW_ID, *classes]
-        check_fit_inputs(config, train, valid, columns, context)
+        training, validation = self.backend.training_data(train, valid, context)
         if rank_zero_only.rank == 0:
             (context.output_dir / "classes.json").write_text(
                 json.dumps(classes, indent=2), encoding="utf-8"
             )
-        focal_count = training.cumulative_sizes[0]
-        self.sampler = SourceWeightedRandomSampler(
-            focal_count,
-            len(training) - focal_count,
-            soundscape_probability=config.loader.soundscape_probability,
-            generator=torch.Generator().manual_seed(config.loader.seed),
-        )
-        data = TrainingDataModule(training, validation, config=config.loader, sampler=self.sampler)
+        data = self._training_loader(training, validation)
         context.tracker.log_hyperparams({**config.safe_dump(), "num_classes": len(classes)})
         continuing = (context.output_dir / "checkpoints" / "last.ckpt").is_file()
-        self._module = AudioCNNModule(
-            config.model, config.lr_scheduler, classes=classes, initialize_pretrained=not continuing
-        )
+        self._module = self.backend.module(initialize_pretrained=not continuing)
         self._best = fit_module(
             self._module,
             data,
@@ -95,6 +91,21 @@ class AudioCNN(BirdClefModel):
         )
         if rank_zero_only.rank != 0:
             return
+        self._save_validation(valid, context)
+
+    def _training_loader(
+        self, training: MixedSourceDataset, validation: Dataset
+    ) -> TrainingDataModule:
+        config = self.config
+        self.sampler = SourceWeightedRandomSampler(
+            training.sources,
+            soundscape_probability=config.loader.soundscape_probability,
+            generator=torch.Generator().manual_seed(config.loader.seed),
+        )
+        return TrainingDataModule(training, validation, config=config.loader, sampler=self.sampler)
+
+    def _save_validation(self, valid: pd.DataFrame, context: RunContext) -> None:
+        classes = self.classes
         predictions = self.predict(valid)
         auc, report = evaluate(valid[[ROW_ID, *classes]], predictions)
         predictions.to_csv(context.output_dir / "validation-predictions.csv", index=False)
@@ -119,7 +130,7 @@ class AudioCNN(BirdClefModel):
             return pd.DataFrame(columns=[ROW_ID, *classes])
         validate_row_ids(frame)
         loader = prediction_dataloader(
-            InferenceSoundscapeDataset(frame, transform=log_mel), config=self.config.loader
+            self.backend.prediction_data(frame), config=self.config.loader
         )
         predictions = predict_module(
             self._module, loader, runtime=self.config.runtime, best=self._best

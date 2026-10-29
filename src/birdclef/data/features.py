@@ -22,8 +22,15 @@ def feature_tensor(frame: pd.DataFrame, columns: list[str]) -> torch.Tensor:
 class FeatureDataset(Dataset[torch.Tensor]):
     """Inference samples contain inputs only, without a singleton tuple wrapper."""
 
-    def __init__(self, frame: pd.DataFrame, columns: list[str]) -> None:
-        self.features = feature_tensor(frame, columns)
+    def __init__(
+        self, frame: pd.DataFrame | torch.Tensor, columns: list[str] | None = None
+    ) -> None:
+        if isinstance(frame, torch.Tensor):
+            self.features = frame
+        else:
+            self.features = feature_tensor(
+                frame, columns if columns is not None else frame.columns.tolist()
+            )
 
     def __len__(self) -> int:
         return len(self.features)

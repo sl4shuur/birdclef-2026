@@ -10,7 +10,9 @@ Choose CPU and Internet OFF. Installation uses `--no-index`.
 Set `RUN_DIRS` to the model paths printed in the notebook. One run uses one model.
 Several runs average probabilities after aligning IDs and classes.
 `WEIGHTS=None` gives equal weights; otherwise give one positive weight per run.
-Loading supports this project's AudioCNN runs. Other architectures need another loader.
+Loading supports this project's EfficientNet and frozen Perch runs, including mixed
+ensembles. Perch exports include `encoder.onnx` and `encoder.json`; rebuild the
+wheelhouse to include ONNX Runtime before offline inference.
 Inference uses one CPU device, FP32, saved processing and class order. It starts no
 W&B run and downloads no weights.
 

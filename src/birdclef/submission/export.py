@@ -48,6 +48,7 @@ def _discover_runs(roots: tuple[Path, ...]) -> dict[Path, Path]:
 def main(runs: tuple[Path, ...], select_all: bool, output: Path) -> None:
     """Find saved models, select them with checkboxes, and pack an inference ZIP."""
     from birdclef.models import AudioExperimentConfig, read_fit_state
+    from birdclef.models.classifier.backends import backend_class
 
     if output.suffix != ".zip":
         raise click.ClickException("Output must be a .zip file.")
@@ -95,6 +96,8 @@ def main(runs: tuple[Path, ...], select_all: bool, output: Path) -> None:
                     json.dumps(config.safe_dump(), indent=2), encoding="utf-8"
                 )
                 shutil.copyfile(run / "classes.json", destination / "classes.json")
+                for name in backend_class(config.model.encoder).artifacts:
+                    shutil.copyfile(run / name, destination / name)
                 state = read_fit_state(run).model_copy(
                     update={"best_checkpoint": relative.as_posix()}
                 )
