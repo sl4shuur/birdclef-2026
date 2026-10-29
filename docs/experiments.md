@@ -52,5 +52,12 @@ Higher local AUC did not improve private scores. The original MLP remains best
 
 The [4th-place solution writeup](https://www.kaggle.com/competitions/birdclef-2026/writeups/4-th-place-solution) reports **~0.928 standalone LB for Perch v2** in its model summary table.
 
-For new results, record the run name, fold, checkpoint, settings and local score.
-Keep public and private scores in separate columns.
+## Final Perch ensembles
+
+| Experiment | Weights | Local ROC-AUC | Public | Private |
+| --- | --- | ---: | ---: | ---: |
+| E1 | MLP 50%, MLP dropout 0.5 50% | 0.92940 | 0.89161 | 0.89848 |
+| E2 | MLP 80%, baseline BiLSTM 20% | 0.92633 | 0.89093 | **0.90087** |
+| E3 | MLP 80%, BiLSTM-256 20% | 0.93161 | 0.89245 | 0.89913 |
+| E4 | MLP 50%, MLP dropout 0.5 30%, BiLSTM-256 20% | 0.93330 | **0.89393** | 0.90016 |
+| E5 | MLP 50%, BiLSTM-256 50% | 0.93408 | 0.89311 | 0.90051 |
