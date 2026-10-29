@@ -49,6 +49,31 @@ def test_wandb_run_reuses_saved_identity_and_finishes(tmp_path, monkeypatch, fai
     fake_wandb.login.assert_not_called()
 
 
+@pytest.mark.parametrize("training_failed", [False, True])
+def test_wandb_finish_failure_preserves_training_error(tmp_path, monkeypatch, training_failed):
+    module = importlib.import_module("birdclef.loggers.wandb")
+    run = Mock()
+    run.finish.side_effect = RuntimeError("finish failed")
+    fake_wandb = SimpleNamespace(run=None, login=Mock())
+    monkeypatch.setattr(module, "wandb", fake_wandb)
+
+    def open_run(*args, **kwargs):
+        fake_wandb.run = run
+        return Mock()
+
+    monkeypatch.setattr(module, "_open", open_run)
+    original = MemoryError("training allocation failed")
+    expected = MemoryError if training_failed else RuntimeError
+    with pytest.raises(expected) as caught:
+        with module.wandb_run(TrackingConfig(offline=True), name="example", save_dir=tmp_path):
+            if training_failed:
+                raise original
+    if training_failed:
+        assert caught.value is original
+    else:
+        assert str(caught.value) == "finish failed"
+
+
 def test_wandb_prefers_process_secret_and_closes_initialization_failure(tmp_path, monkeypatch):
     module = importlib.import_module("birdclef.loggers.wandb")
     run = Mock()
