@@ -1,10 +1,10 @@
-# Perch → EfficientNet feature distillation
+# Perch -> EfficientNet feature distillation
 
 Start with `notebooks/local/perch_distillation.ipynb` (D1).
 Use `SMOKE_RUN=True` for one epoch per stage; set it to `False` and Run All for
 the real experiment. Smoke outputs live in separate `smoke/` folders.
 
-1. **Features:** ImageNet EfficientNet-B0 → trainable projection → Perch features.
+1. **Features:** ImageNet EfficientNet-B0 -> trainable projection -> Perch features.
    Minimize mean cosine distance; train the entire encoder. The projection's dimensions
    come from the student and cached teacher vectors, not fixed constants.
    Use centered 5-second focal crops and exact soundscape windows, matching the existing

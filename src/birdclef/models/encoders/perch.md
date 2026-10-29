@@ -25,7 +25,7 @@ AudioModelConfig(
 )
 ```
 
-`hidden_dim=512` selects LayerNorm → Linear → ReLU → Dropout → Linear.
+`hidden_dim=512` selects LayerNorm -> Linear -> ReLU -> Dropout -> Linear.
 `hidden_dim=None` selects the existing dropout/linear head. Input size comes from
 the embeddings; output size follows `classes.json`. Neither 1536 nor 234 is
 hardcoded in the head. EfficientNet also supports `hidden_dim`, and its current

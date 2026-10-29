@@ -52,16 +52,12 @@ Higher local AUC did not improve private scores. The original MLP remains the be
 
 The [4th-place solution writeup](https://www.kaggle.com/competitions/birdclef-2026/writeups/4-th-place-solution) reports **~0.928 standalone LB for Perch v2** in its model summary table.
 
-## Perch → EfficientNet distillation
+## Perch -> EfficientNet distillation
 
 | Experiment | Kaggle notebook version | Local ROC-AUC | Public | Private |
 | --- | --- | ---: | ---: | ---: |
-| D0: ImageNet EfficientNet-B0, full fine-tuning (historical baseline) | BirdCLEF submit, v1 | 0.87771 | 0.80213 | 0.82236 |
-| D1: Perch feature distillation → EfficientNet-B0 full fine-tuning | BirdCLEF submit, v16 | **0.89463** | **0.82217** | **0.84502** |
-
-D1 completed 3 supervised epochs; the best checkpoint is `epoch002.ckpt`.
-The student improved over the historical baseline, with different training budgets.
-Inference uses only EfficientNet; Perch and its cache are not required.
+| ImageNet EfficientNet-B0, full fine-tuning (historical baseline) | BirdCLEF submit, v1 | 0.87771 | 0.80213 | 0.82236 |
+| Perch feature distillation -> EfficientNet-B0 full fine-tuning | BirdCLEF submit, v16 | **0.89463** | **0.82217** | **0.84502** |
 
 ## Final Perch ensembles
 

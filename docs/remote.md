@@ -55,7 +55,7 @@ For two GPUs, choose T4 ×2. Batch size and worker count are per GPU.
 `WANDB_OFFLINE=False` enables online tracking. Set it to `True` if you want local
 W&B logs instead. You can upload those logs later with `wandb sync`.
 
-Edit the settings in the notebook. Use Save Version → Save & Run All for a clean
+Edit the settings in the notebook. Use Save Version -> Save & Run All for a clean
 run. Running interactively first and then using Save & Run All trains twice.
 Download the ZIP from Output when the run ends. The run folder also stays in
 `/kaggle/working`.
