@@ -10,7 +10,7 @@ import rich_click as click
 from birdclef.cli_common import CONTEXT_SETTINGS as CONTEXT_SETTINGS
 from birdclef.config import PROJECT_ROOT
 
-EXTRAS = ("notebooks", "audio", "deep-learning")
+EXTRAS = ("notebooks", "audio", "deep-learning", "perch")
 
 
 def run(*command: str, cwd: Path = PROJECT_ROOT) -> str:
