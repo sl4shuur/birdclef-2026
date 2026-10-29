@@ -1,144 +1,86 @@
-# Acoustic baseline
+# Training
 
-`AudioCNN` implements the `BirdClefModel.fit/predict` contract.
-It uses the shared trainer, checkpoint handling and resume guard. Script launches
-support Lightning DDP on multiple GPUs, including gradual encoder unfreezing.
+Run `notebooks/local/data_prep.ipynb`, then open
+`notebooks/local/audio_baseline.ipynb` with the project `.venv` kernel.
+Set `RUN_NAME` and the settings in the code cell. `SMOKE_RUN=True` runs one short
+epoch with full-fold validation. Use a new folder for full training.
 
-## Run locally
-
-Install `uv sync --extra notebooks --extra audio --extra deep-learning`, select
-the repository `.venv` kernel and run `notebooks/local/data_prep.ipynb`. Then open
-`notebooks/local/audio_baseline.ipynb`, edit the parameters and run its `%run` cell.
-Logs and progress appear directly in the notebook. Interrupt the cell to stop.
-`SMOKE_RUN=True` runs one short epoch on a small mixed-source training subset and
-retains the entire validation fold; `False` starts a separate full-data run.
-
-The same entry point works from a terminal:
+Local `%run` shows progress in the notebook. Use one device there. For DDP, run
+the CLI as a separate process. See [remote setup](../../../../docs/remote.md).
 
 ```bash
-python -m birdclef.models.audio_cnn.fit --config <json> --name audio-cnn/linear-probing
+python -m birdclef.models.audio_cnn.fit --config <config.json> --name <run/name>
 ```
 
-Prepared artifacts default to `data.output_dir/data_prep`. The entry point owns
-split loading, smoke sampling, W&B tracking, training and best-checkpoint reports.
-Paths and tracking settings come from `.env` or the environment. `WANDB_API_KEY`
-takes precedence over the configured key; saved configs exclude secrets. Offline
-runs can be uploaded later with `wandb sync`.
+`--prepared-dir` changes the default `data.output_dir/data_prep` folder.
+Paths and tracking settings come from `.env` or the environment. Online W&B uses
+`WANDB_API_KEY` (first choice) or `BCLEF_TRACKING__API_KEY`.
+Offline logs can be uploaded later with `wandb sync`.
 
-## Run on Kaggle
+## Settings
 
-Build `build/birdclef-kaggle.zip` with
-`uv run --extra audio --extra deep-learning python -m scripts.kaggle.wheelhouse build`.
-Attach it as a Dataset along with competition audio, import
-`notebooks/kaggle/starter.ipynb`, and select GPU with Internet ON. The notebook
-installs the fresh package, reads the saved folds/weights from the Dataset, and
-runs the current local partial-unfreezing configuration through `!python -u -m`.
-Use Save Version → Save & Run All; afterwards download `partial-unfreeze.zip`
-from Output. W&B is offline by default and needs no secret.
+The current model uses a mono EfficientNet-B0 and a dropout/linear head.
+Log-Mel inputs have shape `(B, 1, 128, 497)`. Each input is standardized by its
+own mean and standard deviation (minimum 1e-6). The RGB stem uses mean RGB weights.
+Global average pooling gives 1280 features. Training uses BCE, AdamW and sigmoid
+probabilities at inference. There are no fitted input statistics.
 
-The Kaggle starter targets T4 ×2: `devices=2`, FP16 mixed precision, 64 examples
-per GPU (128 effective), two persistent data workers per GPU and pinned memory.
-CPU/BLAS threads are limited to one per process to avoid oversubscription.
-Convolutions use channels-last memory and cuDNN benchmarking. These settings
-change the effective batch size; keep it fixed when comparing experiments.
+The first pretrained run can download ImageNet weights. Saved models need no download.
 
-A Kaggle T4 benchmark of the pretrained model after partial unfreezing measured
-1302, 1228 and 1053 examples/s on one GPU at batches 64, 128 and 256 respectively.
-This excludes audio I/O and Log-Mel preprocessing; it is not full training throughput.
+| Setting | Meaning |
+| --- | --- |
+| `encoder_lr`, `head_lr` | Learning rates for the two parts |
+| `unfreeze_epoch=None` | Keep the encoder frozen |
+| `unfreeze_epoch=0` | Train it from the first epoch |
+| `unfreeze_epoch=2` | Start before the third epoch |
+| `unfreeze_last_n=None` | Use all nine encoder blocks |
+| `unfreeze_last_n=2` | Use the last two blocks |
 
-## Model and validation
+Example settings (starting points, not measured best settings):
 
-The encoder is torchvision's [EfficientNet-B0](https://docs.pytorch.org/vision/stable/models/generated/torchvision.models.efficientnet_b0.html),
-optionally initialized from `IMAGENET1K_V1`. Its RGB stem becomes a mono 3x3
-convolution initialized with the RGB weight mean. Input is float32 Log-Mel with
-shape `(B, 1, 128, 497)` for five seconds, standardized per spectrogram with a
-minimum standard deviation of 1e-6. No statistics are fitted on validation.
-Global average pooling yields 1280 features; the dropout/linear head produces
-one logit per species. BCE with logits and AdamW train the selected parameters;
-inference applies sigmoid. `encoder`, `pool` and `head` are explicit modules.
+| Run | Head LR | Encoder LR | Unfreeze epoch | Last blocks |
+| --- | --- | --- | --- | --- |
+| Linear probing | 1e-3 | 3e-5 (unused) | None | None |
+| Gradual unfreezing | 3e-4 | 3e-5 | 2 | None |
+| Partial unfreezing | 3e-4 | 3e-5 | 0 | 2 |
 
-`load_audio_split` verifies version-2 prepared hashes and class order, rebuilds
-paths and uses saved folds. Training combines focal clips and soundscape windows;
-validation contains soundscapes with no filenames shared with training. Focal
-supervision remains weak; this does not establish site independence or remove
-acoustic duplicates.
+For a fair comparison, keep fold, seed, batch size, dropout and source mix the
+same. A useful starting setup is 10 epochs with early-stopping patience 10,
+so the gradual run can finish its planned frozen and unfrozen stages.
 
-Macro ROC-AUC uses `eval.score` on the complete validation epoch. Classes without
-positives are skipped; a class without negatives raises before training. Sanity
-batches are excluded. Detailed per-class AUC/support are calculated for the best
-checkpoint after training. The notebook monitors `val/auc` in max mode.
-DDP gathers validation shards, restores their sequential order and removes
-sampler padding before computing AUC. Final predictions and artifacts are written
-on rank zero using one GPU, preserving row order without distributed duplicates.
+Frozen blocks keep BatchNorm statistics fixed and stochastic depth off.
+All parameters stay in the optimizer from the start. The scheduler runs for both
+groups each epoch. Resume restores optimizer/scheduler state and the freeze stage.
 
-## Three fine-tuning experiments
+DDP registers frozen parameters too, so later unfreezing keeps gradients in sync.
+It gathers validation results, restores row order and removes sampler padding.
+Only rank zero writes final reports and runs final prediction on one device.
+GPU training uses channels-last inputs, mixed precision and cuDNN benchmarking.
+Batch size and worker count are per device; keep effective batch size fixed for comparisons.
+A T4 forward/backward check measured 1302/1228/1053 samples per second at batches
+64/128/256. These numbers exclude audio loading and processing.
 
-Use the same fold, seed, loader, dropout, sampling probability and scheduler.
-In the notebook set `SMOKE_RUN=False`; use `max_epochs=10` and
-`early_stopping_patience=10` for all three runs. This gives the gradual experiment
-two frozen epochs and eight fine-tuning epochs without early stopping cutting
-either stage short. These learning rates are starting hypotheses, not measured
-optima.
+## Runs and results
 
-Change `RUN_NAME` and the fields in `AudioModelConfig`:
+Runs use folders such as `outputs/audio-cnn/my-run`; smoke checks use `smoke/` below it.
+Names must be relative paths, with no empty parts, `.` or `..`.
 
-| Experiment | RUN_NAME | head_lr | encoder_lr | unfreeze_epoch | unfreeze_last_n |
-| --- | --- | --- | --- | --- | --- |
-| A: Linear probing | `audio-cnn/linear-probing` | `1e-3` | `3e-5` (unused) | `None` | `None` |
-| B: Gradual unfreezing | `audio-cnn/gradual-unfreeze` | `3e-4` | `3e-5` | `2` | `None` |
-| C: Partial unfreezing | `audio-cnn/partial-unfreeze` | `3e-4` | `3e-5` | `0` | `2` |
+Each run saves config, classes, input checks, best/last checkpoints and validation
+CSV/JSON reports. W&B gets loss, LR, AUC, per-class scores and the best model artifact.
+API keys are not saved. `wandb-run-id.txt` keeps the same online run ID on resume.
+The W&B run closes on success, error or interruption.
 
-`unfreeze_epoch` is zero-based: `None` keeps the encoder frozen, `0` starts
-fine-tuning immediately, and `2` unfreezes before the third training epoch.
-`unfreeze_last_n=None` selects the entire encoder; `2` selects the last two of
-its nine top-level torchvision feature blocks, including the final convolution.
-Both encoder and head are registered in the optimizer from the beginning, even
-when the encoder is frozen. Schedulers operate on both groups and resume their
-saved state. Trainability is recomputed from the restored epoch.
-DDP registers initially frozen parameters too, so gradients are synchronized
-when those parameters become trainable in a later epoch.
+Raise `max_epochs` to continue the same run. Only epoch count and checkpoint count
+may change. New data, class order, fold or training settings need a new run folder.
+Resume checks data hashes and settings; preprocessing-code changes are not checked
+yet. Random crops and sampling may not continue bit for bit.
 
-Frozen blocks have gradients disabled and remain in eval mode when Lightning
-switches the model back to training. Their BatchNorm running statistics and
-stochastic depth remain fixed. The head stays trainable. The shared module owns
-BCE/sigmoid and optimizer/scheduler creation; the acoustic module supplies the
-two parameter groups and encoder trainability.
+Validation uses a full soundscape fold, with no shared recording files in training.
+The score skips classes without positives; classes without negatives cause an error.
+This file split does not guarantee new-site performance or remove duplicate sounds.
+Saved local scores are one-fold scores, not pooled OOF scores.
 
-## Saved runs and inference
-
-`fit` saves best/last checkpoints, config, input signature, `classes.json`,
-`validation-predictions.csv`, `validation-class-metrics.csv` and
-`validation-metrics.json`. W&B also receives the per-class table and a model
-artifact containing the best checkpoint and these files with relative paths.
-`wandb_run` preserves online identity and closes the run even after an error.
-
-`RUN_NAME`/`--name` supplies a short relative path:
-
-```text
-outputs/audio-cnn/
-  linear-probing/
-  gradual-unfreeze/
-  partial-unfreeze/
-```
-
-`config.run_name()` validates this path and adds `/smoke` for a smoke check.
-Hyperparameters stay in the saved config. The shared resume guard checks ordered
-column names, data hashes and training settings in `fit-inputs.json`; only epoch
-budget and checkpoint count may change. Changed settings require a new name.
-Optimizer, scheduler and epoch state resume; sampling/crop RNG continuation is
-not guaranteed bit for bit.
-
-Construct `AudioCNN(config, classes=classes)` using prepared class order. Classes
-are dataset/model metadata, saved beside and inside the checkpoint and checked
-at inference. The current format requires all three: config, ordered-column input
-signature and checkpoint class metadata.
-
-`AudioCNN.from_run` restores architecture without downloading pretrained weights;
-`predict` loads the checkpoint and preserves manifest row IDs/order. It needs no
-targets. Interrupted runs without a recorded best checkpoint use
-`checkpoints/last.ckpt`; the training resume logic remains strict about best/last
-state. Build windows from actual files with `competition.soundscape_windows`
-and use the submission helpers to align and validate predictions. The notebook's
-optional CPU benchmark predicts one real minute, including checkpoint loading,
-decode, Log-Mel and inference. Its CSV and timing check local plumbing, not
-model quality or hidden-test runtime.
+`AudioCNN.from_run` loads the saved config and classes. It uses the best checkpoint
+from `fit.json`, or `checkpoints/last.ckpt` if no best is recorded. Class order is
+checked against the checkpoint. `predict` keeps input row IDs and needs no targets.
+See [submission](../../submission/README.md) for export and offline inference.

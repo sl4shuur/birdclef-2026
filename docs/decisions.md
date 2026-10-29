@@ -1,5 +1,8 @@
 # Decisions
 
-Use short entries: date, decision, motivation, alternatives, risks.
+- Keep all windows from one recording in the same fold.
+- Save class order with each model.
+- Keep training and inference code shared across notebooks.
+- Use a new run folder for changed data or training settings.
 
-- YYYY-MM-DD — Chose validation strategy TODO because TODO.
+For a new decision, write the date, choice and reason here.
